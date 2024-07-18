@@ -1,6 +1,6 @@
-module main
+module bif
 
-enum Opcode {
+pub enum Opcode {
 	label                = 1
 	func_info
 	int_code_end
@@ -347,6 +347,6 @@ const arities = {
 	'is_tagged_tuple':      4
 }
 
-fn (o Opcode) arity() u8 {
-	return arities[o.str()] or { u8(0) }
+pub fn (o Opcode) arity() u8 {
+	return bif.arities[o.str()] or { u8(0) }
 }
