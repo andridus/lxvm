@@ -18,14 +18,14 @@ fn test_get_next_bytes() {
 	assert received_message2 == 'hide: EOF'
 }
 
-fn test_get_next_to_u32() {
+fn test_get_next_u32() {
 	mut db := DataBytes{
 		data: [u8(0), 0, 0, 5, 0, 0, 71, 2, 1, 0]
 	}
-	assert db.get_next_to_u32()! == u32(5)
-	assert db.get_next_to_u32()! == u32(18178)
+	assert db.get_next_u32()! == u32(5)
+	assert db.get_next_u32()! == u32(18178)
 	mut received_message2 := ''
-	db.get_next_to_u32() or { received_message2 = err.msg() }
+	db.get_next_u32() or { received_message2 = err.msg() }
 	assert received_message2 == 'hide: EOF'
 }
 
