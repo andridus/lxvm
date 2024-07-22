@@ -2,6 +2,15 @@ module beam
 
 import encoding.binary
 import errors
+import registry
+import bif
+import math.big
+
+struct FunctionEntry {
+	fun   u32
+	arity u32
+	label u32
+}
 
 struct DataBytes {
 pub mut:
@@ -231,7 +240,7 @@ fn (mut m ModuleInternal) load_code(mut data DataBytes) ! {
 	data.ignore_bytes(sub_size)!
 	m.code = DataBytes{
 		data: data.get_all_next_bytes()!
-}
+	}
 }
 
 fn (mut m ModuleInternal) load_loct(mut data DataBytes) ! {
@@ -253,4 +262,164 @@ pub fn (mut m ModuleInternal) align_bytes(size u64) {
 	rem := size % 4
 	value := if rem == 0 { 0 } else { 4 - u32(rem) }
 	m.bytes.current_pos += u32(value)
+}
+
+struct OpcodeArgs {
+	op   bif.Opcode
+	args []registry.Value
+}
+
+fn (mut m ModuleInternal) scan_instructions() []OpcodeArgs {
+	mut op_args := []OpcodeArgs{}
+	for {
+		op := m.code.get_next_byte() or { break }
+		opcode := bif.Opcode.from(op) or {
+			errors.new_error('invalid opcode ${op}')
+			break
+		}
+		mut args := []registry.Value{}
+		if opcode.arity() > 0 {
+			for _ in 0 .. opcode.arity() {
+				arg := m.code.compact_term_encoding() or {
+					errors.new_error('invalid term encoding ${err.msg()}')
+					break
+				}
+				args << arg
+			}
+		}
+		op_args << OpcodeArgs{
+			op: opcode
+			args: args
+		}
+	}
+	return op_args
+}
+
+pub fn (mut db DataBytes) compact_term_encoding() !registry.Value {
+	b := db.get_next_byte()!
+	tag := b & 0b111 // it uses only three first bytes
+	if tag < 0b111 {
+		value := db.read_int(b)!
+		if value is registry.Integer {
+			return match tag {
+				0 {
+					registry.Value(registry.Literal(u32(value)))
+				}
+				1 {
+					registry.Value(registry.Integer(value))
+				}
+				2 {
+					registry.Value(registry.Atom(u32(value)))
+				}
+				3 {
+					registry.Value(registry.RegX(u32(value)))
+				}
+				4 {
+					registry.Value(registry.RegY(u32(value)))
+				}
+				5 {
+					registry.Value(registry.Label(u32(value)))
+				}
+				6 {
+					registry.Value(registry.Character(u8(value)))
+				}
+				else {
+					errors.new_error('unracheable value\n')
+					registry.Value(registry.Integer(0))
+				}
+			}
+		} else {
+			errors.new_error('unracheable value\n')
+			return registry.Integer(0)
+		}
+	}
+	return db.parse_extended_term(b)
+}
+
+fn (mut db DataBytes) parse_extended_term(b u8) !registry.Value {
+	return match b {
+		0b0001_0111 {
+			db.parse_list()!
+		}
+		0b0010_0111 {
+			db.parse_float_reg()!
+		}
+		0b0011_0111 {
+			db.parse_alloc_list()!
+		}
+		0b0100_0111 {
+			db.parse_extended_literal()!
+		}
+		else {
+			errors.new_error('unracheable value\n')
+			error('unreachable')
+		}
+	}
+}
+
+fn (mut db DataBytes) parse_list() !registry.Value {
+	return registry.ExtendedList([]registry.Value{})
+}
+
+fn (mut db DataBytes) parse_float_reg() !registry.Value {
+	return registry.FloatReg(0)
+}
+
+fn (mut db DataBytes) parse_alloc_list() !registry.Value {
+	return registry.AllocList([u32(0)])
+}
+
+fn (mut db DataBytes) parse_extended_literal() !registry.Value {
+	return registry.ExtendedLiteral(0)
+}
+
+fn (mut db DataBytes) read_smallint(b u8) !int {
+	val := db.read_int(b)!
+	if val is registry.Integer {
+		return val
+	} else {
+		errors.new_error('unracheable value\n')
+		return 0
+	}
+}
+
+fn (mut db DataBytes) read_int(b u8) !registry.Value {
+	// it's not extended
+	if 0 == (b & 0b1000) {
+		// the bit 3 == 0, then value is placed in bit 4,5,6,7
+		return registry.Integer(b >> 4)
+	}
+
+	// Bit 3 is 1, but...
+	if 0 == (b & 0b1_0000) {
+		/*
+					Bit 4 is 0, For values under 16#800 (2048) bit 3 is set to 1,
+				 	marks that 1 continuation byte will be used and 3 most significant
+				 	bits of the value will extend into this byte's bits 5-6-7
+				 */
+		continuation_byte := db.get_next_byte()! // continuation byte
+		return registry.Integer((b & 0b1110_0000) << 3 | continuation_byte)
+	} else {
+		/*
+					Larger and negative values are first converted to bytes.
+					Then, if the value takes 2..8 bytes, bits 3-4 will be set to 1,
+					and bits 5-6-7 will contain the (Bytes-2) size for the value
+				*/
+		mut n_bytes := (b >> 5) + 2
+		if n_bytes == 9 {
+			/*
+					If the following value is greater than 8 bytes,
+					then all bits 3-4-5-6-7 will be set to 1, followed by
+					a nested encoded unsigned ?tag_u value of (Bytes-9):8
+					*/
+			len := db.get_next_byte()!
+			size0 := db.read_smallint(len)!
+			n_bytes = u8(size0) + 9 // TODO: enforce unsigned
+		}
+
+		bytes := db.get_next_bytes(n_bytes)!
+
+		r := big.integer_from_bytes(bytes)
+		return registry.BigInt(r)
+	}
 }

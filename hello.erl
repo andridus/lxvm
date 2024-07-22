@@ -1,4 +1,5 @@
 -module(hello).
--export([world/0]).
+-export([world/0, bigger/0]).
 
 world()->"hello world".
+bigger()-> -10000000001000000000000002000002000010000000000000001.

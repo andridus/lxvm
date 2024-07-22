@@ -1,11 +1,12 @@
 module terms
 
-pub struct Nil {
-	value u8
-}
+import math.big
+
+pub type AnyInteger = big.Integer | int | u64
+pub type Nil = u8
 
 pub struct Integer {
-	value int
+	value AnyInteger
 }
 
 pub struct Atom {
