@@ -23,6 +23,7 @@ mut:
 	bytes          DataBytes
 	total_atoms    u32
 	atoms          []string
+	sub_size       u32
 	version        u32
 	opcode_max     u32
 	labels         u32
@@ -232,12 +233,12 @@ fn (mut m ModuleInternal) load_atu8(mut data DataBytes) ! {
 }
 
 fn (mut m ModuleInternal) load_code(mut data DataBytes) ! {
-	sub_size := data.get_next_u32()!
+	m.sub_size = data.get_next_u32()!
 	m.version = data.get_next_u32()!
 	m.opcode_max = data.get_next_u32()!
 	m.labels = data.get_next_u32()!
 	m.functions = data.get_next_u32()!
-	data.ignore_bytes(sub_size)!
+	// data.ignore_bytes(sub_size)!
 	m.code = DataBytes{
 		data: data.get_all_next_bytes()!
 	}
@@ -264,13 +265,12 @@ pub fn (mut m ModuleInternal) align_bytes(size u64) {
 	m.bytes.current_pos += u32(value)
 }
 
-struct OpcodeArgs {
+struct Instruction {
 	op   bif.Opcode
 	args []registry.Value
 }
-
-fn (mut m ModuleInternal) scan_instructions() []OpcodeArgs {
-	mut op_args := []OpcodeArgs{}
+fn (mut m ModuleInternal) scan_instructions() []Instruction {
+	mut op_args := []Instruction{}
 	for {
 		op := m.code.get_next_byte() or { break }
 		opcode := bif.Opcode.from(op) or {
@@ -287,7 +287,7 @@ fn (mut m ModuleInternal) scan_instructions() []OpcodeArgs {
 				args << arg
 			}
 		}
-		op_args << OpcodeArgs{
+		op_args << Instruction{
 			op: opcode
 			args: args
 		}
