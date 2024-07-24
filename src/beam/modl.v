@@ -18,28 +18,6 @@ pub mut:
 	current_pos u32
 }
 
-pub struct ModuleInternal {
-mut:
-	bytes          DataBytes
-	total_atoms    u32
-	atoms          []string
-	sub_size       u32
-	version        u32
-	opcode_max     u32
-	labels         u32
-	functions      u32
-	code           DataBytes
-	function_table []FunctionEntry
-}
-
-fn new(data []u8) ModuleInternal {
-	return ModuleInternal{
-		bytes: DataBytes{
-			data: data
-		}
-	}
-}
-
 fn (mut b DataBytes) get_next_byte() !u8 {
 	bytes := b.get_next_bytes(1)!
 	if bytes.len == 1 {
@@ -83,29 +61,29 @@ fn (mut b DataBytes) ignore_bytes(total int) ! {
 	b.get_next_bytes(u8(total))!
 }
 
-pub fn (mut m ModuleInternal) scan_beam() {
-	m.do_scan_beam() or { errors.parse_error(err) }
-	m.clean()
+pub fn (mut bf BeamFile) scan_beam() {
+	bf.do_scan_beam() or { errors.parse_error(err) }
+	bf.clean()
 }
 
-fn (mut m ModuleInternal) clean() {
-	m.bytes = DataBytes{}
+fn (mut bf BeamFile) clean() {
+	bf.bytes = DataBytes{}
 }
 
-pub fn (mut m ModuleInternal) do_scan_beam() ! {
-	m.bytes.expect_match('FOR1'.bytes())!
-	m.bytes.ignore_bytes(4)!
-	m.bytes.expect_match('BEAM'.bytes())!
+pub fn (mut bf BeamFile) do_scan_beam() ! {
+	bf.bytes.expect_match('FOR1'.bytes())!
+	bf.bytes.ignore_bytes(4)!
+	bf.bytes.expect_match('BEAM'.bytes())!
 	for {
-		name := m.bytes.get_next_bytes(4)!.bytestr()
-		size := m.bytes.get_next_u32()!
+		name := bf.bytes.get_next_bytes(4)!.bytestr()
+		size := bf.bytes.get_next_u32()!
 		mut data := DataBytes{
-			data: m.bytes.get_next_bytes(size)!
+			data: bf.bytes.get_next_bytes(size)!
 		}
-		m.align_bytes(size)
+		bf.align_bytes(size)
 		match name {
 			'AtU8' {
-				m.load_atu8(mut data) or {}
+				bf.load_atoms(mut data) or {}
 			}
 			/*
 			 Atom and `AtU8`, atoms table.
@@ -115,7 +93,7 @@ pub fn (mut m ModuleInternal) do_scan_beam() ! {
 			 The atoms[0] is a module name form `-module(M).` attribute
 			*/
 			'Code' {
-				m.load_code(mut data) or {}
+				bf.load_code(mut data) or {}
 			}
 			/*
 			 `Code`. Compiled Bytecode
@@ -148,7 +126,7 @@ pub fn (mut m ModuleInternal) do_scan_beam() ! {
 			 Sanity check: fun_atom_index must be in atom table range
 			*/
 			'ExpT' {
-				m.load_loct(mut data) or {}
+				bf.load_loct(mut data) or {}
 			}
 			/*
 			 `ExpT`, Export table
@@ -177,7 +155,7 @@ pub fn (mut m ModuleInternal) do_scan_beam() ! {
 			 Encodes functions from other modules invoked by the current module.
 			*/
 			'LocT' {
-				m.load_loct(mut data) or {}
+				bf.load_loct(mut data) or {}
 			}
 			/*
 			 `LocT`, Local Functions
@@ -224,27 +202,30 @@ pub fn (mut m ModuleInternal) do_scan_beam() ! {
 	}
 }
 
-fn (mut m ModuleInternal) load_atu8(mut data DataBytes) ! {
-	m.total_atoms = data.get_next_u32()!
-	for _ in 0 .. m.total_atoms {
+fn (mut bf BeamFile) load_atoms(mut data DataBytes) ! {
+	bf.total_atoms = data.get_next_u32()!
+	for _ in 0 .. bf.total_atoms {
 		size0 := data.get_next_byte()!
-		m.atoms << data.get_next_bytes(size0)!.bytestr()
+		atom_str := data.get_next_bytes(size0)!.bytestr()
+		gidx := bf.atom_table.insert(atom_str)
+		bf.atoms << atom_str
+		bf.atoms_map[u32(bf.atoms.len - 1)] = gidx
 	}
 }
 
-fn (mut m ModuleInternal) load_code(mut data DataBytes) ! {
-	m.sub_size = data.get_next_u32()!
-	m.version = data.get_next_u32()!
-	m.opcode_max = data.get_next_u32()!
-	m.labels = data.get_next_u32()!
-	m.functions = data.get_next_u32()!
+fn (mut bf BeamFile) load_code(mut data DataBytes) ! {
+	bf.sub_size = data.get_next_u32()!
+	bf.version = data.get_next_u32()!
+	bf.opcode_max = data.get_next_u32()!
+	bf.labels = data.get_next_u32()!
+	bf.functions = data.get_next_u32()!
 	// data.ignore_bytes(sub_size)!
-	m.code = DataBytes{
+	bf.code = DataBytes{
 		data: data.get_all_next_bytes()!
 	}
 }
 
-fn (mut m ModuleInternal) load_loct(mut data DataBytes) ! {
+fn (mut bf BeamFile) load_loct(mut data DataBytes) ! {
 	fun_total := data.get_next_u32()!
 	mut entries := []FunctionEntry{}
 	for _ in 0 .. fun_total {
@@ -259,20 +240,21 @@ fn (mut m ModuleInternal) load_loct(mut data DataBytes) ! {
 	}
 }
 
-pub fn (mut m ModuleInternal) align_bytes(size u64) {
+pub fn (mut bf BeamFile) align_bytes(size u64) {
 	rem := size % 4
 	value := if rem == 0 { 0 } else { 4 - u32(rem) }
-	m.bytes.current_pos += u32(value)
+	bf.bytes.current_pos += u32(value)
 }
 
 struct Instruction {
 	op   bif.Opcode
 	args []registry.Value
 }
-fn (mut m ModuleInternal) scan_instructions() []Instruction {
+
+fn (mut bf BeamFile) scan_instructions() []Instruction {
 	mut op_args := []Instruction{}
 	for {
-		op := m.code.get_next_byte() or { break }
+		op := bf.code.get_next_byte() or { break }
 		opcode := bif.Opcode.from(op) or {
 			errors.new_error('invalid opcode ${op}')
 			break
@@ -280,7 +262,7 @@ fn (mut m ModuleInternal) scan_instructions() []Instruction {
 		mut args := []registry.Value{}
 		if opcode.arity() > 0 {
 			for _ in 0 .. opcode.arity() {
-				arg := m.code.compact_term_encoding() or {
+				arg := bf.code.compact_term_encoding() or {
 					errors.new_error('invalid term encoding ${err.msg()}')
 					break
 				}
