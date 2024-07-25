@@ -3,7 +3,9 @@ module atom
 const max_atom_chars = u8(255)
 
 pub struct Atom {
+pub:
 	idx u32
+	str string
 }
 
 @[heap]
@@ -33,6 +35,7 @@ pub fn (mut at AtomTable) insert(str string) u32 {
 pub fn (mut at AtomTable) from(str string) Atom {
 	return Atom{
 		idx: at.insert(str)
+		str: str
 	}
 }
 
@@ -40,6 +43,17 @@ pub fn (at AtomTable) lookup(s string) ?Atom {
 	if idx := at.idxs[s] {
 		return Atom{
 			idx: idx
+			str: s
+		}
+	}
+	return none
+}
+
+pub fn (mut at AtomTable) idx_lookup(idx u32) ?Atom {
+	if str := at.atoms[idx] {
+		return Atom{
+			idx: idx
+			str: str
 		}
 	}
 	return none

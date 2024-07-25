@@ -18,6 +18,16 @@ pub mut:
 	current_pos u32
 }
 
+struct Line {
+	pos u32 // position inside the bytecode
+	loc u32 // line number inside the original file
+}
+
+struct FuncInfo {
+	idx  u32
+	line u32
+}
+
 fn (mut b DataBytes) get_next_byte() !u8 {
 	bytes := b.get_next_bytes(1)!
 	if bytes.len == 1 {
@@ -187,7 +197,7 @@ pub fn (mut bf BeamFile) do_scan_beam() ! {
 			 Term Format, and a compiler info (options and version) encoded similarly.
 			*/
 			'Line' {
-				// TODO
+				bf.load_line(mut data) or {}
 			}
 			/*
 			 `Line`, Line Numbers Table
@@ -198,6 +208,46 @@ pub fn (mut bf BeamFile) do_scan_beam() ! {
 
 			*/
 			else {}
+		}
+	}
+}
+
+fn (mut bf BeamFile) load_line(mut data DataBytes) ! {
+	bf.version = data.get_next_u32()!
+
+	if bf.version == 0 {
+		data.ignore_bytes(4)! // flags
+		data.ignore_bytes(4)! // num_line_instructions
+		num_line_items := data.get_next_u32()!
+		num_fnames := data.get_next_u32()!
+		mut idx := u32(0)
+
+		bf.line_items << FuncInfo{
+			idx: 0
+			line: 0
+		} // push origin
+
+		for _ in 0 .. num_line_items {
+			term := data.compact_term_encoding()!
+			match term {
+				registry.Integer {
+					bf.line_items << FuncInfo{
+						idx: idx
+						line: u32(term)
+					}
+				}
+				registry.Atom {
+					idx = u32(term)
+				}
+				else {
+					errors.new_error('unracheable value\n')
+					return error('unreachable')
+				}
+			}
+		}
+		for _ in 0 .. num_fnames {
+			bytes := data.get_next_bytes(2)!
+			bf.file_names << bytes.bytestr()
 		}
 	}
 }
@@ -244,37 +294,6 @@ pub fn (mut bf BeamFile) align_bytes(size u64) {
 	rem := size % 4
 	value := if rem == 0 { 0 } else { 4 - u32(rem) }
 	bf.bytes.current_pos += u32(value)
-}
-
-struct Instruction {
-	op   bif.Opcode
-	args []registry.Value
-}
-
-fn (mut bf BeamFile) scan_instructions() []Instruction {
-	mut op_args := []Instruction{}
-	for {
-		op := bf.code.get_next_byte() or { break }
-		opcode := bif.Opcode.from(op) or {
-			errors.new_error('invalid opcode ${op}')
-			break
-		}
-		mut args := []registry.Value{}
-		if opcode.arity() > 0 {
-			for _ in 0 .. opcode.arity() {
-				arg := bf.code.compact_term_encoding() or {
-					errors.new_error('invalid term encoding ${err.msg()}')
-					break
-				}
-				args << arg
-			}
-		}
-		op_args << Instruction{
-			op: opcode
-			args: args
-		}
-	}
-	return op_args
 }
 
 pub fn (mut db DataBytes) compact_term_encoding() !registry.Value {

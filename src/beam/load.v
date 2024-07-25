@@ -3,6 +3,12 @@ module beam
 import atom
 import os
 
+pub struct MFA {
+	mod      atom.Atom
+	function atom.Atom
+	arity    u32
+}
+
 pub struct BeamFile {
 mut:
 	atom_table     &atom.AtomTable
@@ -20,6 +26,7 @@ mut:
 	line_items     []FuncInfo
 	file_names     []string
 	funs           map[string]u32
+	imports        []MFA
 	code           DataBytes
 	function_table []FunctionEntry
 }

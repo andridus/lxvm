@@ -29,19 +29,19 @@ pub enum Opcode {
 	wait_timeout
 	// Arithmetic opcodes.
 	//
-	// -M_PLUS = 27,
-	// -M_MINUS = 28,
-	// -M_TIMES = 29,
-	// -M_DIV = 30,
-	// -INT_DIV = 31,
-	// -INT_REM = 32,
-	// -INT_BAND = 33,
-	// -INT_BOR = 34,
-	// -INT_BXOR = 35,
-	// -INT_BSL = 36,
-	// -INT_BSR = 37,
-	// -INT_BNOT = 38,
-	is_l                 = 39
+	m_plus
+	m_minus
+	m_times
+	m_div
+	int_div
+	int_rem
+	int_band
+	int_bor
+	int_bxor
+	int_bsl
+	int_bsr
+	int_bnot
+	is_lt
 	is_ge
 	is_eq
 	is_ne
@@ -56,9 +56,9 @@ pub enum Opcode {
 	is_port
 	is_nil
 	is_binary
-	// is_constant = 54
-	is_list              = 55
-	is_non_empty_list
+	is_constant
+	is_list
+	is_nonempty_list
 	is_tuple
 	test_arity
 	select_val
@@ -70,45 +70,45 @@ pub enum Opcode {
 	get_list
 	get_tuple_element
 	set_tuple_element
-	// put_string = 68
-	put_list             = 69
+	put_string
+	put_list
 	put_tuple
 	put
 	badmatch
 	if_end
 	case_end
 	call_fun
-	// make_fun = 76
-	is_function          = 77
+	make_fun
+	is_function
 	call_ext_only
 	//
 	// Binary matching (R7).
 	//
-	// -BS_START_MATCH = 79,
-	// -BS_GET_INTEGER = 80,
-	// -BS_GET_FLOAT = 81,
-	// -BS_GET_BINARY = 82,
-	// -BS_SKIP_BITS = 83,
-	// -BS_TEST_TAIL = 84,
-	// -BS_SAVE = 85,
-	// -BS_RESTORE = 86,
+	bs_start_match
+	bs_get_integer
+	bs_get_float
+	bs_get_binary
+	bs_skip_bits
+	bs_test_tail
+	bs_save
+	bs_restore
 	//
 	// Binary construction (R7A).
 	//
-	// -BS_INIT = 87,
-	// -BS_FINAL = 88,
-	bs_put_integer       = 89
+	bs_init
+	bs_final
+	bs_put_integer
 	bs_put_binary
 	bs_put_float
 	bs_put_string
 	//
 	// Binary construction (R7B).
 	//
-	// -BS_NEED_BUF = 93,
+	bs_need_buf //
 	//
 	// Floating point arithmetic (R8).
 	//
-	f_clear_error        = 94
+	f_clear_error
 	f_check_error
 	f_move
 	f_conv
@@ -117,34 +117,34 @@ pub enum Opcode {
 	f_mul
 	f_div
 	f_negate
-	make_fun_2
+	make_fun2
 	try
 	try_end
 	try_case
 	try_case_end
 	raise
-	bs_init_2
-	// bs_bits_to_bytes//
-	bs_add               = 111
+	bs_init2
+	bs_bits_to_bytes //
+	bs_add
 	apply
 	apply_last
 	is_boolean
-	is_function_2
-	bs_start_match_2
-	bs_get_integer_2
-	bs_get_float_2
-	bs_get_binary_2
-	bs_skip_bits_2
-	bs_test_tail_2
-	bs_save_2
-	bs_restore_2
-	gc_bif_1
-	gc_bif_2
-	// bs_final_2 //
-	// bs_bits_to_byte_2 //
-	// put_literal //
-	is_bitstr            = 129
-	bs_context_to_bianry
+	is_function2
+	bs_start_match2
+	bs_get_integer2
+	bs_get_float2
+	bs_get_binary2
+	bs_skip_bits2
+	bs_test_tail2
+	bs_save2
+	bs_restore2
+	gc_bif1
+	gc_bif2
+	bs_final2 //
+	bs_bits_to_bytes2 //
+	put_literal //
+	is_bitstr
+	bs_context_to_binary
 	bs_test_unit
 	bs_match_string
 	bs_init_writable
@@ -155,9 +155,9 @@ pub enum Opcode {
 	bs_get_utf8
 	bs_skip_utf8
 	bs_get_utf16
-	bf_skip_utf16
+	bs_skip_utf16
 	bs_get_utf32
-	bg_skip_utf32
+	bs_skip_utf32
 	bs_utf8_size
 	bs_put_utf8
 	bs_utf16_size
@@ -166,7 +166,7 @@ pub enum Opcode {
 	on_load
 	recv_mark
 	recv_set
-	gc_bif_3
+	gc_bif3
 	line
 	put_map_assoc
 	put_map_exact
@@ -180,7 +180,7 @@ pub enum Opcode {
 	get_tl
 	put_tuple_2
 	bs_get_tail
-	bs_start_match_3
+	bs_start_match3
 	bs_get_position
 	bs_set_position
 }
@@ -279,15 +279,15 @@ const arities = {
 	'bs_put_float':         5
 	'bs_put_string':        2
 	'bs_need_buf':          1
-	'fclearerror':          0
-	'fcheckerror':          1
-	'fmove':                2
-	'fconv':                2
-	'fadd':                 4
-	'fsub':                 4
-	'fmul':                 4
-	'fdiv':                 4
-	'fnegate':              3
+	'f_clear_error':        0
+	'f_check_error':        1
+	'f_move':               2
+	'f_conv':               2
+	'f_add':                4
+	'f_sub':                4
+	'f_mul':                4
+	'f_div':                4
+	'f_negate':             3
 	'make_fun2':            1
 	'try':                  2
 	'try_end':              1
@@ -345,6 +345,15 @@ const arities = {
 	'has_map_fields':       3
 	'get_map_elements':     3
 	'is_tagged_tuple':      4
+	'build_stack_trace':    0
+	'raw_raise':            0
+	'get_hd':               0
+	'get_tl':               0
+	'put_tuple_2':          0
+	'bs_get_tail':          0
+	'bs_start_match3':      0
+	'bs_get_position':      0
+	'bs_set_position':      0
 }
 
 pub fn (o Opcode) arity() u8 {
