@@ -2,39 +2,63 @@ module beam
 
 import atom
 import os
+import instruction
+import etf
 
 pub struct MFA {
 	mod      atom.Atom
 	function atom.Atom
 	arity    u32
+	label    u32
+}
+
+pub struct Lambda {
+	name   u32
+	arity  u32
+	offset u32
+	index  u32
+	nfree  u32 // frozen values for closures
+	ouniq  u32 // ?
 }
 
 pub struct BeamFile {
-mut:
-	atom_table     &atom.AtomTable
-	bytes          DataBytes
-	total_atoms    u32
-	atoms          []string
-	atoms_map      map[u32]u32
-	sub_size       u32
-	version        u32
-	opcode_max     u32
-	labels         u32
-	mod_labels     map[u32]u32
-	functions      u32
-	lines          []Line
-	line_items     []FuncInfo
-	file_names     []string
+pub mut:
+	bytes      DataBytes
+	atom_table &atom.AtomTable
+	name       atom.Atom
+	sub_size   u32
+	version    u32
+	opcode_max u32
+	mod_labels map[u32]u32
+	functions  u32
+	lines      []Line
+	line_items []FuncInfo
+	file_names []string
+
 	funs           map[string]u32
-	imports        []MFA
 	code           DataBytes
 	function_table []FunctionEntry
+
+	imports      []MFA
+	exports      []MFA
+	literals     []etf.Value
+	attributes   etf.Value
+	lambdas      []Lambda
+	labels       u32
+	total_atoms  u32
+	atoms        []string
+	atoms_map    map[u32]u32
+	instructions []instruction.Instruction
 }
 
 pub fn BeamFile.init(at &atom.AtomTable) BeamFile {
 	return BeamFile{
 		atom_table: at
 	}
+}
+
+pub fn (mut b BeamFile) drop_code() {
+	b.code = DataBytes{}
 }
 
 pub fn (mut b BeamFile) load_file(path string) BeamFile {
@@ -45,6 +69,7 @@ pub fn (mut b BeamFile) load_file(path string) BeamFile {
 	}
 	b.scan_beam()
 	b.post_process()
+	b.drop_code()
 
 	return b
 }

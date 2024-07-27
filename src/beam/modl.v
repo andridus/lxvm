@@ -1,21 +1,14 @@
 module beam
 
-import encoding.binary
 import errors
-import registry
-import bif
-import math.big
+import etf
+import compress.zlib
+// import bif
 
 struct FunctionEntry {
 	fun   u32
 	arity u32
 	label u32
-}
-
-struct DataBytes {
-pub mut:
-	data        []u8
-	current_pos u32
 }
 
 struct Line {
@@ -26,49 +19,6 @@ struct Line {
 struct FuncInfo {
 	idx  u32
 	line u32
-}
-
-fn (mut b DataBytes) get_next_byte() !u8 {
-	bytes := b.get_next_bytes(1)!
-	if bytes.len == 1 {
-		return bytes[0]
-	}
-	return errors.new('EOF')
-}
-
-fn (mut b DataBytes) get_next_bytes(bytes u32) ![]u8 {
-	from := b.current_pos
-	to := b.current_pos + bytes
-	if to <= b.data.len {
-		b.current_pos = to
-		return b.data[from..to]
-	} else {
-		return errors.new('EOF')
-	}
-}
-
-fn (mut b DataBytes) get_all_next_bytes() ![]u8 {
-	from := b.current_pos
-	if from < b.data.len {
-		return b.data[from..]
-	}
-	return errors.new('EOF')
-}
-
-fn (mut b DataBytes) get_next_u32() !u32 {
-	t := b.get_next_bytes(4)!
-	return binary.big_endian_u32(t)
-}
-
-fn (mut b DataBytes) expect_match(list []u8) ! {
-	next := b.get_next_bytes(u8(list.len))!
-	if next != list {
-		return errors.new_error('doesn\'t match term ${next} with ${list}')
-	}
-}
-
-fn (mut b DataBytes) ignore_bytes(total int) ! {
-	b.get_next_bytes(u8(total))!
 }
 
 pub fn (mut bf BeamFile) scan_beam() {
@@ -93,7 +43,7 @@ pub fn (mut bf BeamFile) do_scan_beam() ! {
 		bf.align_bytes(size)
 		match name {
 			'AtU8' {
-				bf.load_atoms(mut data) or {}
+				bf.load_atoms(mut data)!
 			}
 			/*
 			 Atom and `AtU8`, atoms table.
@@ -103,7 +53,7 @@ pub fn (mut bf BeamFile) do_scan_beam() ! {
 			 The atoms[0] is a module name form `-module(M).` attribute
 			*/
 			'Code' {
-				bf.load_code(mut data) or {}
+				bf.load_code(mut data)!
 			}
 			/*
 			 `Code`. Compiled Bytecode
@@ -126,7 +76,7 @@ pub fn (mut bf BeamFile) do_scan_beam() ! {
 			 (Untested Block)
 			*/
 			'FunT' {
-				// TODO
+				bf.load_literals(mut data)!
 			}
 			/*
 			 `FunT`, Function Lambda Table
@@ -136,7 +86,7 @@ pub fn (mut bf BeamFile) do_scan_beam() ! {
 			 Sanity check: fun_atom_index must be in atom table range
 			*/
 			'ExpT' {
-				bf.load_loct(mut data) or {}
+				bf.load_exports(mut data)!
 			}
 			/*
 			 `ExpT`, Export table
@@ -146,7 +96,7 @@ pub fn (mut bf BeamFile) do_scan_beam() ! {
 			 Sanity check: atom table range
 			*/
 			'LitT' {
-				// TODO
+				bf.load_literals(mut data)!
 			}
 			/*
 			 `LitT`, Literals Table
@@ -157,7 +107,7 @@ pub fn (mut bf BeamFile) do_scan_beam() ! {
 			 Values are encoded using the external term format
 			*/
 			'ImpT' {
-				// TODO
+				bf.load_imports(mut data)!
 			}
 			/*
 			 `ImpT`, Imports Table
@@ -165,7 +115,7 @@ pub fn (mut bf BeamFile) do_scan_beam() ! {
 			 Encodes functions from other modules invoked by the current module.
 			*/
 			'LocT' {
-				bf.load_loct(mut data) or {}
+				bf.load_loct(mut data)!
 			}
 			/*
 			 `LocT`, Local Functions
@@ -188,7 +138,7 @@ pub fn (mut bf BeamFile) do_scan_beam() ! {
 			 beam_asm, beam_dict (record #asm{} field strings), and beam_disasm.
 			*/
 			'Attr' {
-				// TODO
+				bf.load_attributes(mut data)!
 			}
 			/*
 			 `Attr`, Attributes
@@ -197,7 +147,7 @@ pub fn (mut bf BeamFile) do_scan_beam() ! {
 			 Term Format, and a compiler info (options and version) encoded similarly.
 			*/
 			'Line' {
-				bf.load_line(mut data) or {}
+				bf.load_line(mut data)!
 			}
 			/*
 			 `Line`, Line Numbers Table
@@ -230,14 +180,14 @@ fn (mut bf BeamFile) load_line(mut data DataBytes) ! {
 		for _ in 0 .. num_line_items {
 			term := data.compact_term_encoding()!
 			match term {
-				registry.Integer {
+				etf.Integer {
 					bf.line_items << FuncInfo{
 						idx: idx
 						line: u32(term)
 					}
 				}
-				registry.Atom {
-					idx = u32(term)
+				etf.Atom {
+					idx = u32(term.idx)
 				}
 				else {
 					errors.new_error('unracheable value\n')
@@ -275,7 +225,63 @@ fn (mut bf BeamFile) load_code(mut data DataBytes) ! {
 	}
 }
 
+fn (mut bf BeamFile) load_literals(mut data DataBytes) ! {
+	total_bytes := data.get_next_u32()!
+	decoded_bytes := zlib.decompress(data.get_all_next_bytes()!)!
+	if total_bytes != decoded_bytes.len {
+		return errors.new_error('length bytes incompatible')
+	}
+	mut decompressed_data := DataBytes{
+		data: decoded_bytes
+	}
+	total_terms := decompressed_data.get_next_u32()! // ignore size
+	for _ in 0 .. total_terms {
+		size := decompressed_data.get_next_u32()! // ignore size
+		value := bf.decode_etf(decompressed_data.get_next_bytes(size)!)!
+		bf.literals << value
+	}
+}
+
+fn (mut bf BeamFile) load_attributes(mut data DataBytes) ! {
+	value := bf.decode_etf(data.get_all_next_bytes()!)!
+	bf.attributes = value
+}
+
+fn (mut bf BeamFile) load_exports(mut data DataBytes) ! {
+	entries := bf.chunk_loct(mut data)!
+	for e in entries {
+		if atom_idx := bf.atoms_map[e.fun] {
+			if function := bf.atom_table.idx_lookup(atom_idx) {
+				bf.exports << MFA{
+					function: function
+					arity: e.arity
+					label: e.label
+				}
+			}
+		}
+	}
+}
+
+fn (mut bf BeamFile) load_imports(mut data DataBytes) ! {
+	entries := bf.chunk_loct(mut data)!
+	for e in entries {
+		if atom_idx := bf.atoms_map[e.fun] {
+			if function := bf.atom_table.idx_lookup(atom_idx) {
+				bf.imports << MFA{
+					function: function
+					arity: e.arity
+					label: e.label
+				}
+			}
+		}
+	}
+}
+
 fn (mut bf BeamFile) load_loct(mut data DataBytes) ! {
+	_ := bf.chunk_loct(mut data)!
+}
+
+fn (bf BeamFile) chunk_loct(mut data DataBytes) ![]FunctionEntry {
 	fun_total := data.get_next_u32()!
 	mut entries := []FunctionEntry{}
 	for _ in 0 .. fun_total {
@@ -288,139 +294,11 @@ fn (mut bf BeamFile) load_loct(mut data DataBytes) ! {
 			label: label
 		}
 	}
+	return entries
 }
 
 pub fn (mut bf BeamFile) align_bytes(size u64) {
 	rem := size % 4
 	value := if rem == 0 { 0 } else { 4 - u32(rem) }
 	bf.bytes.current_pos += u32(value)
-}
-
-pub fn (mut db DataBytes) compact_term_encoding() !registry.Value {
-	b := db.get_next_byte()!
-	tag := b & 0b111 // it uses only three first bytes
-	if tag < 0b111 {
-		value := db.read_int(b)!
-		if value is registry.Integer {
-			return match tag {
-				0 {
-					registry.Value(registry.Literal(u32(value)))
-				}
-				1 {
-					registry.Value(registry.Integer(value))
-				}
-				2 {
-					registry.Value(registry.Atom(u32(value)))
-				}
-				3 {
-					registry.Value(registry.RegX(u32(value)))
-				}
-				4 {
-					registry.Value(registry.RegY(u32(value)))
-				}
-				5 {
-					registry.Value(registry.Label(u32(value)))
-				}
-				6 {
-					registry.Value(registry.Character(u8(value)))
-				}
-				else {
-					errors.new_error('unracheable value\n')
-					registry.Value(registry.Integer(0))
-				}
-			}
-		} else {
-			errors.new_error('unracheable value\n')
-			return registry.Integer(0)
-		}
-	}
-	return db.parse_extended_term(b)
-}
-
-fn (mut db DataBytes) parse_extended_term(b u8) !registry.Value {
-	return match b {
-		0b0001_0111 {
-			db.parse_list()!
-		}
-		0b0010_0111 {
-			db.parse_float_reg()!
-		}
-		0b0011_0111 {
-			db.parse_alloc_list()!
-		}
-		0b0100_0111 {
-			db.parse_extended_literal()!
-		}
-		else {
-			errors.new_error('unracheable value\n')
-			error('unreachable')
-		}
-	}
-}
-
-fn (mut db DataBytes) parse_list() !registry.Value {
-	return registry.ExtendedList([]registry.Value{})
-}
-
-fn (mut db DataBytes) parse_float_reg() !registry.Value {
-	return registry.FloatReg(0)
-}
-
-fn (mut db DataBytes) parse_alloc_list() !registry.Value {
-	return registry.AllocList([u32(0)])
-}
-
-fn (mut db DataBytes) parse_extended_literal() !registry.Value {
-	return registry.ExtendedLiteral(0)
-}
-
-fn (mut db DataBytes) read_smallint(b u8) !int {
-	val := db.read_int(b)!
-	if val is registry.Integer {
-		return val
-	} else {
-		errors.new_error('unracheable value\n')
-		return 0
-	}
-}
-
-fn (mut db DataBytes) read_int(b u8) !registry.Value {
-	// it's not extended
-	if 0 == (b & 0b1000) {
-		// the bit 3 == 0, then value is placed in bit 4,5,6,7
-		return registry.Integer(b >> 4)
-	}
-
-	// Bit 3 is 1, but...
-	if 0 == (b & 0b1_0000) {
-		/*
-					Bit 4 is 0, For values under 16#800 (2048) bit 3 is set to 1,
-				 	marks that 1 continuation byte will be used and 3 most significant
-				 	bits of the value will extend into this byte's bits 5-6-7
-				 */
-		continuation_byte := db.get_next_byte()! // continuation byte
-		return registry.Integer((b & 0b1110_0000) << 3 | continuation_byte)
-	} else {
-		/*
-					Larger and negative values are first converted to bytes.
-					Then, if the value takes 2..8 bytes, bits 3-4 will be set to 1,
-					and bits 5-6-7 will contain the (Bytes-2) size for the value
-				*/
-		mut n_bytes := (b >> 5) + 2
-		if n_bytes == 9 {
-			/*
-					If the following value is greater than 8 bytes,
-					then all bits 3-4-5-6-7 will be set to 1, followed by
-					a nested encoded unsigned ?tag_u value of (Bytes-9):8
-					*/
-			len := db.get_next_byte()!
-			size0 := db.read_smallint(len)!
-			n_bytes = u8(size0) + 9 // TODO: enforce unsigned
-		}
-
-		bytes := db.get_next_bytes(n_bytes)!
-
-		r := big.integer_from_bytes(bytes)
-		return registry.BigInt(r)
-	}
 }

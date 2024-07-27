@@ -1,23 +1,19 @@
 module beam
 
-import registry
+import etf
 import errors
 import bif
+import instruction
 
-struct Instruction {
-	op   bif.Opcode
-	args []registry.Value
-}
-
-fn (mut bf BeamFile) scan_instructions() []Instruction {
-	mut op_args := []Instruction{}
+fn (mut bf BeamFile) scan_instructions() []instruction.Instruction {
+	mut instructions := []instruction.Instruction{}
 	for {
 		op := bf.code.get_next_byte() or { break }
 		opcode := bif.Opcode.from(op) or {
 			errors.new_error('invalid opcode ${op}')
 			break
 		}
-		mut args := []registry.Value{}
+		mut args := []etf.Value{}
 		if opcode.arity() > 0 {
 			for _ in 0 .. opcode.arity() {
 				arg := bf.code.compact_term_encoding() or {
@@ -27,33 +23,16 @@ fn (mut bf BeamFile) scan_instructions() []Instruction {
 				args << arg
 			}
 		}
-		op_args << Instruction{
+		instructions << instruction.Instruction{
 			op: opcode
 			args: args
 		}
 	}
-	return op_args
+	return instructions
 }
 
 fn (mut bf BeamFile) post_process() {
 	bf.process_bif() or { println(err.msg()) }
-}
-
-fn (i Instruction) get_literal(pos int) !u32 {
-	if i.args.len > pos && i.args[pos] is registry.Literal {
-		num := i.args[pos] as registry.Literal
-		return u32(num)
-	} else {
-		return errors.new_error('Bad argument ${i.op}')
-	}
-}
-
-fn (i Instruction) get_value(pos int) !registry.Value {
-	if i.args.len > pos {
-		return i.args[pos]
-	} else {
-		return errors.new_error('Bad argument ${i.op}')
-	}
 }
 
 fn (mut bf BeamFile) process_bif() ! {
@@ -62,7 +41,6 @@ fn (mut bf BeamFile) process_bif() ! {
 	mut last_func_start := u32(0)
 	mut pos := u32(0)
 	mut instructions_len := u32(0)
-	mut instructions0 := []Instruction{}
 	for instruction in instructions {
 		instruction0 := match instruction.op {
 			.label {
@@ -71,11 +49,11 @@ fn (mut bf BeamFile) process_bif() ! {
 				instruction
 			}
 			.func_info {
-				// Instruction args: [_module :: atom, function :: atom, arity:: literal]
+				// instruction.Instruction args: [_module :: atom, function :: atom, arity:: literal]
 				last_func_start = pos
-				atom_idx := instruction.get_value(1)! as registry.Atom
+				atom0 := instruction.get_value(1)! as etf.Atom
 				arity := instruction.get_literal(2)!
-				if atom := bf.atoms_map[atom_idx] {
+				if atom := bf.atoms_map[atom0.idx] {
 					if fun_name := bf.atom_table.idx_lookup(atom) {
 						fun_atom := '${fun_name.str}/${arity}'
 						bf.funs[fun_atom] = instructions_len + 1
@@ -313,6 +291,6 @@ fn (mut bf BeamFile) process_bif() ! {
 		}
 		pos++
 		instructions_len++
-		instructions0 << instruction0
+		bf.instructions << instruction0
 	}
 }

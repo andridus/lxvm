@@ -1,19 +1,26 @@
-module registry
+module etf
 
 import errors
 import math.big
 
-pub type Term = u64
 pub type Literal = u32
 pub type Integer = int
-pub type Atom = u32
+
+pub struct Atom {
+pub:
+	name string
+	idx  u32
+}
+
 pub type Nil = u8
 pub type RegX = u32
 pub type RegY = u32
 pub type Label = u32
+pub type List = []Value
+pub type Tuple = []Value
 pub type Character = u8
 pub type BigInt = big.Integer
-pub type String = []u8
+pub type String = string
 pub type FloatReg = u32
 pub type AllocList = []u32
 pub type ExtendedLiteral = u32
@@ -27,26 +34,30 @@ pub type Value = AllocList
 	| FloatReg
 	| Integer
 	| Label
+	| List
 	| Literal
 	| Nil
 	| RegX
 	| RegY
 	| String
-	| Term
+	| Tuple
 
 pub fn (v Value) str() string {
 	return match v {
+		Nil {
+			'nil'
+		}
 		Literal {
 			a := v as Literal
 			'Literal(${a})'
 		}
 		Integer {
 			a := v as Integer
-			'Integer(${a})'
+			a.str()
 		}
 		Atom {
 			a := v as Atom
-			'Atom(${a})'
+			':${a.name}'
 		}
 		RegX {
 			a := v as RegX
@@ -60,6 +71,22 @@ pub fn (v Value) str() string {
 			a := v as Label
 			'Label(${a})'
 		}
+		List {
+			a := v as List
+			mut s := ''
+			for i in a {
+				s += i.str()
+			}
+			'[${s}]'
+		}
+		Tuple {
+			a := v as Tuple
+			mut s := []string{}
+			for i in a {
+				s << i.str()
+			}
+			'{${s.join(',')}}'
+		}
 		Character {
 			a := v as Character
 			'Character(${a})'
@@ -70,7 +97,7 @@ pub fn (v Value) str() string {
 		}
 		String {
 			a := v as String
-			'String(${a})'
+			"\"${a}\""
 		}
 		FloatReg {
 			a := v as FloatReg
@@ -88,9 +115,6 @@ pub fn (v Value) str() string {
 			a := v as ExtendedList
 			'ExtendedList(${a})'
 		}
-		else {
-			'-'
-		}
 	}
 }
 
@@ -101,7 +125,7 @@ pub:
 	size  int
 }
 
-pub enum Tag {
+pub enum InternalTag {
 	u
 	i
 	a

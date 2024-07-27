@@ -5,6 +5,8 @@ import atom
 
 pub struct VM {
 	atom_table &atom.AtomTable
+mut:
+	modules []beam.BeamFile
 }
 
 pub fn VM.init() VM {
@@ -17,16 +19,13 @@ pub fn VM.init() VM {
 pub fn (mut vm VM) load_beam(path string) {
 	mut b := beam.BeamFile.init(vm.atom_table)
 	loaded_module := b.load_file(path)
-	vm.add_module(loaded_module)
+	vm.modules << loaded_module
+	println(vm)
 }
 
-pub fn (mut vm VM) add_module(modl beam.BeamFile) {
-	println('TODO add module into VM')
-}
-
-pub fn (mut vm VM) loop() {
-	for {
-		println('machine loop')
-		break
-	}
-}
+// pub fn (mut vm VM) loop() {
+// 	for {
+// 		println('machine loop')
+// 		break
+// 	}
+// }

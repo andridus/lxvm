@@ -71,9 +71,16 @@ pub fn parse_error(error IError) {
 		InternalError {
 			match error.kind {
 				.hide {}
-				.info { println(error) }
-				.warn { println(error) }
-				.error { panic(error) }
+				.info {
+					println(error)
+				}
+				.warn {
+					println(error)
+				}
+				.error {
+					println(error)
+					exit(1)
+				}
 			}
 		}
 		else {}
