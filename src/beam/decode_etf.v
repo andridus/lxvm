@@ -78,7 +78,7 @@ fn (bf BeamFile) decode_bignum(n u8, mut data DataBytes) !etf.Value {
 	if size != rest.len {
 		return errors.new_error('invalid bytes for bignum')
 	}
-	r := big.integer_from_bytes(rest, big.IntegerConfig{ signum: sign })
+	r := big.integer_from_bytes(rest.reverse(), big.IntegerConfig{ signum: sign })
 	if r.bit_len() < 60 {
 		return etf.Integer(r.int())
 	} else {
