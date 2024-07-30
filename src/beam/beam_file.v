@@ -46,9 +46,9 @@ pub mut:
 	lambdas      []Lambda
 	labels       u32
 	total_atoms  u32
-	atoms        []string
-	atoms_map    map[u32]u32
-	instructions []instruction.Instruction
+	atoms        []string = ['nil']
+	atoms_map    map[u32]u32 = {u32(0): u32(0)}
+	instructions []instruction.Instruction = [instruction.Instruction{}]
 }
 
 pub fn BeamFile.init(at &atom.AtomTable) BeamFile {

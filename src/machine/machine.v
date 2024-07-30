@@ -20,12 +20,4 @@ pub fn (mut vm VM) load_beam(path string) {
 	mut b := beam.BeamFile.init(vm.atom_table)
 	loaded_module := b.load_file(path)
 	vm.modules << loaded_module
-	println(vm)
 }
-
-// pub fn (mut vm VM) loop() {
-// 	for {
-// 		println('machine loop')
-// 		break
-// 	}
-// }

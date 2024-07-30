@@ -16,9 +16,15 @@ fn (mut bf BeamFile) scan_instructions() []instruction.Instruction {
 		mut args := []etf.Value{}
 		if opcode.arity() > 0 {
 			for _ in 0 .. opcode.arity() {
-				arg := bf.code.compact_term_encoding() or {
-					errors.new_error('invalid term encoding ${err.msg()}')
-					break
+				mut arg := bf.code.compact_term_encoding() or {
+						errors.new_error('invalid term encoding ${err.msg()}')
+						break
+					}
+				if arg is etf.Atom {
+					a := arg as etf.Atom
+					if atom := bf.atoms[a.idx] {
+							arg = etf.Atom{idx: a.idx, name: atom}
+					}
 				}
 				args << arg
 			}
@@ -37,16 +43,20 @@ fn (mut bf BeamFile) post_process() {
 
 fn (mut bf BeamFile) process_bif() ! {
 	instructions := bf.scan_instructions()
+	println(instructions)
 	bf.lines << Line{}
 	mut last_func_start := u32(0)
 	mut pos := u32(0)
 	mut instructions_len := u32(0)
 	for instruction in instructions {
-		instruction0 := match instruction.op {
+		mut add_instruction := true
+		mut instruction0 := instruction
+
+		 match instruction.op {
 			.label {
 				num := instruction.get_literal(0)!
 				bf.mod_labels[num] = instructions_len
-				instruction
+				add_instruction = false
 			}
 			.func_info {
 				// instruction.Instruction args: [_module :: atom, function :: atom, arity:: literal]
@@ -58,14 +68,12 @@ fn (mut bf BeamFile) process_bif() ! {
 						fun_atom := '${fun_name.str}/${arity}'
 						bf.funs[fun_atom] = instructions_len + 1
 					}
-					instruction
 				} else {
 					return errors.new_error('Not found atom ${instruction.op}')
 				}
 			}
 			.int_code_end {
 				bf.funs['nil/0'] = instructions_len
-				break
 			}
 			// .call { return errors.new_error('`call` not implemented') }
 			// .call_last { return errors.new_error('`call_last` not implemented') }
@@ -76,14 +84,13 @@ fn (mut bf BeamFile) process_bif() ! {
 				// dest := instruction.get_literal(0)!
 				// mfa := bf.imports[dest]
 				// fun := bif.get(mfa)!
-				instruction
 				// dest :=
 			}
 			.bif1 {
-				return errors.new_error('`bif1` not implemented')
+				// return errors.new_error('`bif1` not implemented')
 			}
 			.bif2 {
-				return errors.new_error('`bif2` not implemented')
+				// return errors.new_error('`bif2` not implemented')
 			}
 			// .allocate { return errors.new_error('`allocate` not implemented') }
 			// .allocate_heap { return errors.new_error('`allocate_heap` not implemented') }
@@ -144,10 +151,10 @@ fn (mut bf BeamFile) process_bif() ! {
 			// .put_string { return errors.new_error('`put_string` not implemented') }
 			// .put_list { return errors.new_error('`put_list` not implemented') }
 			.put_tuple {
-				return errors.new_error('`put_tuple` not implemented')
+				// return errors.new_error('`put_tuple` not implemented')
 			}
 			.put {
-				return errors.new_error('`put` should be implemented by put_tuple2')
+				// return errors.new_error('`put` should be implemented by put_tuple2')
 			}
 			// .badmatch { return errors.new_error('`badmatch` not implemented') }
 			// .if_end { return errors.new_error('`if_end` not implemented') }
@@ -170,7 +177,7 @@ fn (mut bf BeamFile) process_bif() ! {
 			// .bs_put_binary { return errors.new_error('`bs_put_binary` not implemented') }
 			// .bs_put_float { return errors.new_error('`bs_put_float` not implemented') }
 			.bs_put_string {
-				return errors.new_error('`bs_put_string` not implemented')
+				// return errors.new_error('`bs_put_string` not implemented')
 			}
 			// .bs_need_buf { return errors.new_error('`bs_need_buf` not implemented') }
 			// .f_clear_error { return errors.new_error('`f_clear_error` not implemented') }
@@ -204,10 +211,10 @@ fn (mut bf BeamFile) process_bif() ! {
 			// .bs_save2 { return errors.new_error('`bs_save2` not implemented') }
 			// .bs_restore2 { return errors.new_error('`bs_restore2` not implemented') }
 			.gc_bif1 {
-				return errors.new_error('`gc_bif1` not implemented')
+				// return errors.new_error('`gc_bif1` not implemented')
 			}
 			.gc_bif2 {
-				return errors.new_error('`gc_bif2` not implemented')
+				// return errors.new_error('`gc_bif2` not implemented')
 			}
 			// .bs_final2 { return errors.new_error('`bs_final2` not implemented') }
 			// .bs_bits_to_bytes2 { return errors.new_error('`bs_bits_to_bytes2` not implemented') }
@@ -216,7 +223,7 @@ fn (mut bf BeamFile) process_bif() ! {
 			// .bs_context_to_binary { return errors.new_error('`bs_context_to_binary` not implemented') }
 			// .bs_test_unit { return errors.new_error('`bs_test_unit` not implemented') }
 			.bs_match_string {
-				return errors.new_error('`bs_match_string` not implemented')
+				// return errors.new_error('`bs_match_string` not implemented')
 			}
 			// .bs_init_writable { return errors.new_error('`bs_init_writable` not implemented') }
 			// .bs_append { return errors.new_error('`bs_append` not implemented') }
@@ -235,12 +242,12 @@ fn (mut bf BeamFile) process_bif() ! {
 			// .bs_put_utf16 { return errors.new_error('`bs_put_utf16` not implemented') }
 			// .bs_put_utf32 { return errors.new_error('`bs_put_utf32` not implemented') }
 			.on_load {
-				return errors.new_error('`on_load` not implemented')
+				// return errors.new_error('`on_load` not implemented')
 			}
 			// .recv_mark { return errors.new_error('`recv_mark` not implemented') }
 			// .recv_set { return errors.new_error('`recv_set` not implemented') }
 			.gc_bif3 {
-				return errors.new_error('`gc_bif3` not implemented')
+				// return errors.new_error('`gc_bif3` not implemented')
 			}
 			.line {
 				if bf.line_items.len > 0 {
@@ -257,7 +264,6 @@ fn (mut bf BeamFile) process_bif() ! {
 							loc: u32(loc.line)
 						}
 					}
-					instruction
 				} else {
 					return errors.new_error('unreachable')
 				}
@@ -274,23 +280,23 @@ fn (mut bf BeamFile) process_bif() ! {
 			// .get_tl{ return errors.new_error('`get_tl` not implemented') }
 			// .put_tuple_2{ return errors.new_error('`put_tuple_2` not implemented') }
 			.bs_get_tail {
-				return errors.new_error('`bs_get_tail` not implemented')
+				// return errors.new_error('`bs_get_tail` not implemented')
 			}
 			.bs_start_match3 {
-				return errors.new_error('`bs_start_match3` not implemented')
+				// return errors.new_error('`bs_start_match3` not implemented')
 			}
 			.bs_get_position {
-				return errors.new_error('`bs_get_position` not implemented')
+				// return errors.new_error('`bs_get_position` not implemented')
 			}
 			.bs_set_position {
-				return errors.new_error('`bs_set_position` not implemented')
+				// return errors.new_error('`bs_set_position` not implemented')
 			}
-			else {
-				instruction
-			}
+			else {}
 		}
 		pos++
 		instructions_len++
-		bf.instructions << instruction0
+		if add_instruction {
+			bf.instructions << instruction0
+		}
 	}
 }
