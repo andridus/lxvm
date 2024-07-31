@@ -17,13 +17,16 @@ fn (mut bf BeamFile) scan_instructions() []instruction.Instruction {
 		if opcode.arity() > 0 {
 			for _ in 0 .. opcode.arity() {
 				mut arg := bf.code.compact_term_encoding() or {
-						errors.new_error('invalid term encoding ${err.msg()}')
-						break
-					}
+					errors.new_error('invalid term encoding ${err.msg()}')
+					break
+				}
 				if arg is etf.Atom {
 					a := arg as etf.Atom
 					if atom := bf.atoms[a.idx] {
-							arg = etf.Atom{idx: a.idx, name: atom}
+						arg = etf.Atom{
+							idx: a.idx
+							name: atom
+						}
 					}
 				}
 				args << arg
@@ -43,7 +46,6 @@ fn (mut bf BeamFile) post_process() {
 
 fn (mut bf BeamFile) process_bif() ! {
 	instructions := bf.scan_instructions()
-	println(instructions)
 	bf.lines << Line{}
 	mut last_func_start := u32(0)
 	mut pos := u32(0)
@@ -52,7 +54,7 @@ fn (mut bf BeamFile) process_bif() ! {
 		mut add_instruction := true
 		mut instruction0 := instruction
 
-		 match instruction.op {
+		match instruction.op {
 			.label {
 				num := instruction.get_literal(0)!
 				bf.mod_labels[num] = instructions_len
@@ -66,7 +68,7 @@ fn (mut bf BeamFile) process_bif() ! {
 				if atom := bf.atoms_map[atom0.idx] {
 					if fun_name := bf.atom_table.idx_lookup(atom) {
 						fun_atom := '${fun_name.str}/${arity}'
-						bf.funs[fun_atom] = instructions_len + 1
+						bf.funs[fun_atom] = instructions_len
 					}
 				} else {
 					return errors.new_error('Not found atom ${instruction.op}')
@@ -250,6 +252,7 @@ fn (mut bf BeamFile) process_bif() ! {
 				// return errors.new_error('`gc_bif3` not implemented')
 			}
 			.line {
+				add_instruction = false
 				if bf.line_items.len > 0 {
 					num := instruction.get_literal(0)!
 					loc := bf.line_items[int(num)]
@@ -294,8 +297,8 @@ fn (mut bf BeamFile) process_bif() ! {
 			else {}
 		}
 		pos++
-		instructions_len++
 		if add_instruction {
+			instructions_len++
 			bf.instructions << instruction0
 		}
 	}

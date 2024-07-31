@@ -131,7 +131,13 @@ fn (mut db DataBytes) parse_alloc_list() !etf.Value {
 }
 
 fn (mut db DataBytes) parse_extended_literal() !etf.Value {
-	return etf.ExtendedLiteral(0)
+	b := db.get_next_byte()!
+	val := db.read_int(b)!
+	if val is etf.Integer {
+		return etf.ExtendedLiteral(u32(val))
+	} else {
+		return error('not an integer')
+	}
 }
 
 fn (mut db DataBytes) read_smallint(b u8) !int {
@@ -180,7 +186,7 @@ fn (mut db DataBytes) read_int(b u8) !etf.Value {
 
 		bytes := db.get_next_bytes(n_bytes)!
 
-		r := big.integer_from_bytes(bytes)
+		r := big.integer_from_bytes(bytes.reverse())
 		return etf.BigInt(r)
 	}
 }

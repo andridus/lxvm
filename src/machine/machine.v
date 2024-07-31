@@ -2,11 +2,16 @@ module machine
 
 import beam
 import atom
+import etf
 
 pub struct VM {
-	atom_table &atom.AtomTable
 mut:
-	modules []beam.BeamFile
+	atom_table &atom.AtomTable
+	modules    []beam.BeamFile
+	reg_x      [16]etf.Value
+	reg_y      [16]etf.Value
+	cp         int = -1
+	ip         u32
 }
 
 pub fn VM.init() VM {

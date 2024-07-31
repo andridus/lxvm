@@ -24,7 +24,8 @@ struct FuncInfo {
 pub fn (mut bf BeamFile) scan_beam() {
 	bf.do_scan_beam() or {
 		// hide is not an error
-		errors.parse_error(err) }
+		errors.parse_error(err)
+	}
 	bf.clean()
 }
 
