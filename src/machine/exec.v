@@ -4,6 +4,13 @@ import etf
 import beam
 import bif
 
+pub fn (mut vm VM) exec_args(fun string, args []etf.Value) ! {
+	for i, arg in args {
+		vm.reg_x[i] = arg
+	}
+	vm.exec(fun)!
+}
+
 pub fn (mut vm VM) exec(fun string) ! {
 	vm.ip = vm.modules[0].funs[fun] or {
 		println("the function `${fun}` doesn't exists!")
