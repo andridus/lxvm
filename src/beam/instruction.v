@@ -57,7 +57,7 @@ fn (mut bf BeamFile) process_bif() ! {
 		match instruction.op {
 			.label {
 				num := instruction.get_literal(0)!
-				bf.mod_labels[num] = instructions_len
+				bf.labels[num] = instructions_len
 				add_instruction = false
 			}
 			.func_info {

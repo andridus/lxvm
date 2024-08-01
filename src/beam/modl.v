@@ -2,13 +2,14 @@ module beam
 
 import errors
 import etf
+import atom
 import compress.zlib
 // import bif
 
 struct FunctionEntry {
+	mod   u32
 	fun   u32
 	arity u32
-	label u32
 }
 
 struct Line {
@@ -220,7 +221,7 @@ fn (mut bf BeamFile) load_code(mut data DataBytes) ! {
 	bf.sub_size = data.get_next_u32()!
 	bf.version = data.get_next_u32()!
 	bf.opcode_max = data.get_next_u32()!
-	bf.labels = data.get_next_u32()!
+	bf.total_labels = data.get_next_u32()!
 	bf.functions = data.get_next_u32()!
 	// data.ignore_bytes(sub_size)!
 	bf.code = DataBytes{
@@ -253,14 +254,12 @@ fn (mut bf BeamFile) load_attributes(mut data DataBytes) ! {
 fn (mut bf BeamFile) load_exports(mut data DataBytes) ! {
 	entries := bf.chunk_loct(mut data)!
 	for e in entries {
-		if atom_idx := bf.atoms_map[e.fun] {
-			if function := bf.atom_table.idx_lookup(atom_idx) {
-				bf.exports << MFA{
-					function: function
-					arity: e.arity
-					label: e.label
-				}
-			}
+		mod_atom := bf.get_atom_from_idx(e.mod)!
+		fun_atom := bf.get_atom_from_idx(e.fun)!
+		bf.exports << etf.MFA{
+			mod: mod_atom
+			fun: fun_atom
+			arity: e.arity
 		}
 	}
 }
@@ -268,16 +267,23 @@ fn (mut bf BeamFile) load_exports(mut data DataBytes) ! {
 fn (mut bf BeamFile) load_imports(mut data DataBytes) ! {
 	entries := bf.chunk_loct(mut data)!
 	for e in entries {
-		if atom_idx := bf.atoms_map[e.fun] {
-			if function := bf.atom_table.idx_lookup(atom_idx) {
-				bf.imports << MFA{
-					function: function
-					arity: e.arity
-					label: e.label
-				}
-			}
+		mod_atom := bf.get_atom_from_idx(e.mod)!
+		fun_atom := bf.get_atom_from_idx(e.fun)!
+		bf.imports << etf.MFA{
+			mod: mod_atom
+			fun: fun_atom
+			arity: e.arity
 		}
 	}
+}
+
+fn (mut bf BeamFile) get_atom_from_idx(idx u32) !atom.Atom {
+	if loc_idx := bf.atoms_map[idx] {
+		if atom := bf.atom_table.idx_lookup(loc_idx) {
+			return atom
+		}
+	}
+	return error('not found atom')
 }
 
 fn (mut bf BeamFile) load_loct(mut data DataBytes) ! {
@@ -288,13 +294,13 @@ fn (bf BeamFile) chunk_loct(mut data DataBytes) ![]FunctionEntry {
 	fun_total := data.get_next_u32()!
 	mut entries := []FunctionEntry{}
 	for _ in 0 .. fun_total {
+		mod := data.get_next_u32()!
 		fun := data.get_next_u32()!
 		arity := data.get_next_u32()!
-		label := data.get_next_u32()!
 		entries << FunctionEntry{
+			mod: mod
 			fun: fun
 			arity: arity
-			label: label
 		}
 	}
 	return entries

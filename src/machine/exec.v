@@ -2,15 +2,15 @@ module machine
 
 import etf
 import beam
+import bif
 
-pub fn (mut vm VM) exec(fun string) {
+pub fn (mut vm VM) exec(fun string) ! {
 	vm.ip = vm.modules[0].funs[fun] or {
 		println("the function `${fun}` doesn't exists!")
 		exit(0)
 	}
 	for {
 		instruction := vm.modules[0].instructions[vm.ip]
-
 		vm.ip++
 		match instruction.op {
 			.func_info {
@@ -24,19 +24,32 @@ pub fn (mut vm VM) exec(fun string) {
 				arg_a := instruction.args[0]
 				arg_b := instruction.args[1]
 				val := vm.load_arg(vm.modules[0], arg_a)
+
 				match arg_b {
 					etf.RegX {
 						a := arg_b as etf.RegX
 						vm.reg_x[a] = val
+						println('MOVE ${val} to X[${a}]')
 					}
 					etf.RegY {
 						a := arg_b as etf.RegY
 						vm.reg_y[a] = val
+						println('MOVE ${val} to Y[${a}]')
 					}
 					else {
 						println('unhandled register type ${arg_b}')
 						exit(1)
 					}
+				}
+			}
+			.call_only {
+				// [arity, jmp]
+				println('CALL ${instruction.args}')
+				// arity := instruction.args[0]
+				jmp := instruction.args[1]
+				if jmp is etf.Label {
+					// vm.cp = vm.ip
+					vm.ip = vm.modules[0].labels[jmp]
 				}
 			}
 			.call_ext_only {
@@ -54,6 +67,38 @@ pub fn (mut vm VM) exec(fun string) {
 			}
 			.int_code_end {
 				println('Finished processing instructions')
+			}
+			.gc_bif2 {
+				// [fail, live, bif_fun, arg1, arg2, dest]
+
+				// fail := instruction.args[0]
+				// live := instruction.args[1]
+				if instruction.args[2] is etf.Literal {
+					bif_fun := instruction.args[2] as etf.Literal
+					arg1 := vm.load_arg(vm.modules[0], instruction.args[3])
+					arg2 := vm.load_arg(vm.modules[0], instruction.args[4])
+					ret := instruction.args[5]
+					mfa := vm.modules[0].imports[bif_fun]
+					val := bif.apply(mfa, [arg1, arg2])!
+					// val := etf.Nil(0)
+					println('APPLY BIF ${mfa}, the result: ${val}')
+					// save in register
+					match ret {
+						etf.RegX {
+							vm.reg_x[ret] = val
+						}
+						etf.RegY {
+							vm.reg_y[ret] = val
+						}
+						else {}
+					}
+
+					// println(vm.modules[0].imports)
+				} else {
+					println('error')
+					// dest := instruction.args[5]
+				}
+				println(instruction.args)
 			}
 			else {
 				println('TODO ${instruction.op}')
@@ -85,12 +130,10 @@ fn (mut vm VM) load_arg(mod beam.BeamFile, arg etf.Value) etf.Value {
 			mod.literals[idx]
 		}
 		etf.RegX {
-			println('regx')
-			etf.Nil(0)
+			vm.reg_x[arg]
 		}
 		etf.RegY {
-			println('regy')
-			etf.Nil(0)
+			vm.reg_y[arg]
 		}
 		else {
 			arg

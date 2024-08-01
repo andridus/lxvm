@@ -5,13 +5,6 @@ import os
 import instruction
 import etf
 
-pub struct MFA {
-	mod      atom.Atom
-	function atom.Atom
-	arity    u32
-	label    u32
-}
-
 pub struct Lambda {
 	name   u32
 	arity  u32
@@ -29,7 +22,7 @@ pub mut:
 	sub_size   u32
 	version    u32
 	opcode_max u32
-	mod_labels map[u32]u32
+
 	functions  u32
 	lines      []Line
 	line_items []FuncInfo
@@ -39,12 +32,13 @@ pub mut:
 	code           DataBytes
 	function_table []FunctionEntry
 
-	imports      []MFA
-	exports      []MFA
+	imports      []etf.MFA
+	exports      []etf.MFA
 	literals     []etf.Value
 	attributes   etf.Value
 	lambdas      []Lambda
-	labels       u32
+	total_labels u32
+	labels       map[u32]u32
 	total_atoms  u32
 	atoms        []string    = ['nil']
 	atoms_map    map[u32]u32 = {
