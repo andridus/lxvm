@@ -30,11 +30,12 @@ pub type ExtendedList = []Value
 pub type Value = AllocList
 	| Atom
 	| BigInt
+	| CP
 	| Character
 	| ExtendedList
 	| ExtendedLiteral
-	| FloatReg
 	| Float
+	| FloatReg
 	| Integer
 	| Label
 	| List
@@ -44,7 +45,6 @@ pub type Value = AllocList
 	| RegY
 	| String
 	| Tuple
-	| CP
 
 pub fn (v Value) str() string {
 	return match v {

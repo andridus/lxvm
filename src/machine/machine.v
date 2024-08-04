@@ -9,15 +9,17 @@ mut:
 	atom_table &atom.AtomTable
 	modules    []beam.BeamFile
 	reg_x      [16]etf.Value
-	reg_y      [16]etf.Value
+	stack      &Stack
 	cp         int = -1
 	ip         u32
 }
 
 pub fn VM.init() VM {
 	atom_table := atom.AtomTable.new()
+	stack := Stack{}
 	return VM{
 		atom_table: &atom_table
+		stack: &stack
 	}
 }
 

@@ -66,6 +66,11 @@ pub fn hide(msg string) InternalError {
 	}
 }
 
+pub fn panic(msg string) {
+	println(msg)
+	exit(1)
+}
+
 pub fn parse_error(error IError) {
 	match error {
 		InternalError {

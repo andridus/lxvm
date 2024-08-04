@@ -42,6 +42,7 @@ fn (mut b DataBytes) get_next_u32() !u32 {
 	t := b.get_next_bytes(4)!
 	return binary.big_endian_u32(t)
 }
+
 fn (mut b DataBytes) get_next_u16() !u16 {
 	t := b.get_next_bytes(2)!
 	return binary.big_endian_u16(t)

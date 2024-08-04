@@ -5,7 +5,7 @@ import errors
 import bif
 import instruction
 
-fn (mut bf BeamFile) scan_instructions() []instruction.Instruction {
+fn (mut bf BeamFile) scan_instructions() ![]instruction.Instruction {
 	mut instructions := []instruction.Instruction{}
 	for {
 		op := bf.code.get_next_byte() or { break }
@@ -17,8 +17,7 @@ fn (mut bf BeamFile) scan_instructions() []instruction.Instruction {
 		if opcode.arity() > 0 {
 			for _ in 0 .. opcode.arity() {
 				mut arg := bf.code.compact_term_encoding() or {
-					errors.new_error('invalid term encoding ${err.msg()}')
-					break
+					return errors.new_error('opcode: `${opcode}` invalid term encoding ${err.msg()}')
 				}
 				if arg is etf.Atom {
 					a := arg as etf.Atom
@@ -45,7 +44,7 @@ fn (mut bf BeamFile) post_process() {
 }
 
 fn (mut bf BeamFile) process_bif() ! {
-	instructions := bf.scan_instructions()
+	instructions := bf.scan_instructions()!
 	bf.lines << Line{}
 	mut last_func_start := u32(0)
 	mut pos := u32(0)

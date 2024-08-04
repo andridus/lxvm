@@ -3,6 +3,7 @@ module machine
 import etf
 import beam
 import bif
+import errors
 
 pub fn (mut vm VM) exec_args(fun string, args []etf.Value) ! {
 	for i, arg in args {
@@ -13,109 +14,152 @@ pub fn (mut vm VM) exec_args(fun string, args []etf.Value) ! {
 
 pub fn (mut vm VM) exec(fun string) ! {
 	vm.ip = vm.modules[0].funs[fun] or {
-		println("the function `${fun}` doesn't exists!")
+		errors.panic("the function `${fun}` doesn't exists!")
 		exit(0)
 	}
+	mut i := 0
 	for {
+		i++
 		instruction := vm.modules[0].instructions[vm.ip]
 		vm.ip++
 		match instruction.op {
-			.func_info {
-				mod0 := instruction.args[0]
-				fun0 := instruction.args[1]
-				arity := instruction.args[2]
-				arity0 := arity as etf.Literal
-				println('Running a function {${mod0}, ${fun0}, ${arity0}}')
-			}
+			.func_info {}
 			.move {
 				arg_a := instruction.args[0]
 				arg_b := instruction.args[1]
-				val := vm.load_arg(vm.modules[0], arg_a)
+				val := vm.get_arg_value(vm.modules[0], arg_a)
 
 				match arg_b {
 					etf.RegX {
 						a := arg_b as etf.RegX
 						vm.reg_x[a] = val
-						println('MOVE ${val} to X[${a}]')
 					}
 					etf.RegY {
-						a := arg_b as etf.RegY
-						vm.reg_y[a] = val
-						println('MOVE ${val} to Y[${a}]')
+						vm.stack.update(vm.stack.total() - (arg_b + 2), val)
 					}
 					else {
-						println('unhandled register type ${arg_b}')
+						errors.panic('unhandled register type ${arg_b}')
 						exit(1)
 					}
 				}
 			}
-			.call_only {
+			.call {
 				// [arity, jmp]
-				println('CALL ${instruction.args}')
-				// arity := instruction.args[0]
 				jmp := instruction.args[1]
 				if jmp is etf.Label {
-					// vm.cp = vm.ip
-					vm.ip = vm.modules[0].labels[jmp]
+					vm.cp = vm.ip
+					vm.ip = vm.modules[0].labels[jmp] - 1
 				}
 			}
-			.call_ext_only {
-				println('CALL EXT ${instruction.args}')
+			.call_only {
+				// [arity, jmp]
+				jmp := instruction.args[1]
+				if jmp is etf.Label {
+					vm.ip = vm.modules[0].labels[jmp] - 1
+				}
 			}
+			.call_ext_only {}
 			.return_ {
 				if vm.cp == -1 {
 					println('Process exited with normal')
 					println('x: ${vm.reg_x}')
-					println('y: ${vm.reg_y}')
+					println('stack: ${vm.stack}')
 					break
 				}
 				vm.ip = u32(vm.cp)
 				vm.cp = -1
 			}
-			.int_code_end {
-				println('Finished processing instructions')
-			}
+			.int_code_end {}
 			.gc_bif2 {
+				if instruction.args.len != 6 {
+					return error('not args')
+				}
 				// [fail, live, bif_fun, arg1, arg2, dest]
 
 				// fail := instruction.args[0]
 				// live := instruction.args[1]
 				if instruction.args[2] is etf.Literal {
 					bif_fun := instruction.args[2] as etf.Literal
-					arg1 := vm.load_arg(vm.modules[0], instruction.args[3])
-					arg2 := vm.load_arg(vm.modules[0], instruction.args[4])
+					arg1 := vm.get_arg_value(vm.modules[0], instruction.args[3])
+					arg2 := vm.get_arg_value(vm.modules[0], instruction.args[4])
 					ret := instruction.args[5]
 					mfa := vm.modules[0].imports[bif_fun]
 					val := bif.apply(mfa, [arg1, arg2])!
 					// val := etf.Nil(0)
-					println('APPLY BIF ${mfa}, the result: ${val}')
 					// save in register
 					match ret {
 						etf.RegX {
 							vm.reg_x[ret] = val
 						}
 						etf.RegY {
-							vm.reg_y[ret] = val
+							vm.stack.update(vm.stack.total() - (ret + 2), val)
 						}
 						else {}
 					}
 
 					// println(vm.modules[0].imports)
 				} else {
-					println('error')
-					// dest := instruction.args[5]
+					errors.panic('error')
+					exit(1)
 				}
-				println(instruction.args)
+			}
+			.allocate_zero {
+				if instruction.args[0] is etf.Literal && instruction.args[1] is etf.Literal {
+					need := instruction.args[0] as etf.Literal
+					for _ in 0 .. u32(need) {
+						vm.stack.put(etf.Nil(0))
+					}
+					vm.stack.put(etf.CP(vm.cp))
+				} else {
+					errors.panic('Bad Argument!')
+					exit(1)
+				}
+			}
+			.deallocate {
+				arg_a := instruction.args[0]
+				cp := vm.stack.pop()
+				if arg_a is etf.Literal {
+					vm.stack.trim(vm.stack.total() - arg_a)
+					if cp is etf.CP {
+						vm.cp = cp
+					} else {
+						errors.panic('Bad CP value! ${cp}')
+					}
+				} else {
+					errors.panic('bad argument')
+				}
+			}
+			.is_eq {
+				if instruction.args.len == 3 {
+					fail := vm.get_label(vm.modules[0], instruction.args[0])!
+					arg1 := vm.get_arg_value(vm.modules[0], instruction.args[1])
+					arg2 := vm.get_arg_value(vm.modules[0], instruction.args[2])
+					if arg1 != arg2 {
+						vm.ip = fail
+					}
+				} else {
+					errors.panic('Bad Argument!')
+				}
 			}
 			else {
-				println('TODO ${instruction.op}')
+				errors.panic('TODO ${instruction.op}')
 				break
 			}
 		}
 	}
 }
 
-fn (mut vm VM) load_arg(mod beam.BeamFile, arg etf.Value) etf.Value {
+fn (mut vm VM) get_label(mod beam.BeamFile, arg etf.Value) !u32 {
+	if arg is etf.Label {
+		a := arg as etf.Label
+		if vm.modules[0].labels.len > a {
+			return mod.labels[u32(a)]
+		}
+	}
+	return error('not found')
+}
+
+fn (mut vm VM) get_arg_value(mod beam.BeamFile, arg etf.Value) etf.Value {
 	return match arg {
 		etf.Atom {
 			atom_ := arg as etf.Atom
@@ -140,7 +184,7 @@ fn (mut vm VM) load_arg(mod beam.BeamFile, arg etf.Value) etf.Value {
 			vm.reg_x[arg]
 		}
 		etf.RegY {
-			vm.reg_y[arg]
+			vm.stack.get(vm.stack.total() - (arg + 2))
 		}
 		else {
 			arg
