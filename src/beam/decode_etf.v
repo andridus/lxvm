@@ -18,6 +18,9 @@ pub fn (mut bf BeamFile) decode_etf(data []u8) !etf.Value {
 pub fn (mut bf BeamFile) decode_term(mut data DataBytes) !etf.Value {
 	tag := etf.Tag.from(data.get_next_byte()!)!
 	return match tag {
+		.atom_ext {
+			bf.decode_atom_ext(mut data)!
+		}
 		.small_atom_utf8_ext {
 			bf.decode_atom(mut data)!
 		}
@@ -50,6 +53,19 @@ fn (mut bf BeamFile) decode_atom(mut data DataBytes) !etf.Value {
 	//    length: 1-bytes
 	//		atom_name: length-bytes
 	size := data.get_next_byte()!
+	str := data.get_next_bytes(size)!
+	atom := bf.atom_table.from(str.bytestr())
+	return etf.Atom{
+		idx: atom.idx
+		name: atom.str
+	}
+}
+
+fn (mut bf BeamFile) decode_atom_ext(mut data DataBytes) !etf.Value {
+	//		small_atom_utf8_ext
+	//    length: 1-bytes
+	//		atom_name: length-bytes
+	size := data.get_next_u16()!
 	str := data.get_next_bytes(size)!
 	atom := bf.atom_table.from(str.bytestr())
 	return etf.Atom{
