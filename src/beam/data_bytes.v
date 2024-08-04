@@ -42,6 +42,10 @@ fn (mut b DataBytes) get_next_u32() !u32 {
 	t := b.get_next_bytes(4)!
 	return binary.big_endian_u32(t)
 }
+fn (mut b DataBytes) get_next_u16() !u16 {
+	t := b.get_next_bytes(2)!
+	return binary.big_endian_u16(t)
+}
 
 fn (mut b DataBytes) expect_match(list []u8) ! {
 	next := b.get_next_bytes(u8(list.len))!
@@ -85,13 +89,11 @@ pub fn (mut db DataBytes) compact_term_encoding() !etf.Value {
 					etf.Value(etf.Character(u8(value)))
 				}
 				else {
-					errors.new_error('unracheable value\n')
-					etf.Value(etf.Integer(0))
+					return errors.new_error('unracheable value\n')
 				}
 			}
 		} else {
-			errors.new_error('unracheable value\n')
-			return etf.Integer(0)
+			return errors.new_error('unracheable value\n')
 		}
 	}
 	return db.parse_extended_term(b)
@@ -100,26 +102,32 @@ pub fn (mut db DataBytes) compact_term_encoding() !etf.Value {
 fn (mut db DataBytes) parse_extended_term(b u8) !etf.Value {
 	return match b {
 		0b0001_0111 {
-			db.parse_list()!
+			db.parse_float()!
 		}
 		0b0010_0111 {
-			db.parse_float_reg()!
+			db.parse_list()!
 		}
 		0b0011_0111 {
-			db.parse_alloc_list()!
+			db.parse_float_reg()!
 		}
 		0b0100_0111 {
+			db.parse_alloc_list()!
+		}
+		0b0101_0111 {
 			db.parse_extended_literal()!
 		}
 		else {
 			errors.new_error('unracheable value\n')
-			error('unreachable')
 		}
 	}
 }
 
 fn (mut db DataBytes) parse_list() !etf.Value {
 	return etf.ExtendedList([]etf.Value{})
+}
+
+fn (mut db DataBytes) parse_float() !etf.Value {
+	return etf.Float(0.0)
 }
 
 fn (mut db DataBytes) parse_float_reg() !etf.Value {

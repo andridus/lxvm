@@ -5,6 +5,7 @@ import math.big
 
 pub type Literal = u32
 pub type Integer = int
+pub type Float = f64
 
 pub struct Atom {
 pub:
@@ -22,6 +23,7 @@ pub type Character = u8
 pub type BigInt = big.Integer
 pub type String = string
 pub type FloatReg = u32
+pub type CP = int
 pub type AllocList = []u32
 pub type ExtendedLiteral = u32
 pub type ExtendedList = []Value
@@ -32,6 +34,7 @@ pub type Value = AllocList
 	| ExtendedList
 	| ExtendedLiteral
 	| FloatReg
+	| Float
 	| Integer
 	| Label
 	| List
@@ -41,11 +44,15 @@ pub type Value = AllocList
 	| RegY
 	| String
 	| Tuple
+	| CP
 
 pub fn (v Value) str() string {
 	return match v {
 		Nil {
-			'nil'
+			'Nil'
+		}
+		CP {
+			'CP(${v.str()})'
 		}
 		Literal {
 			a := v as Literal
@@ -53,7 +60,7 @@ pub fn (v Value) str() string {
 		}
 		Integer {
 			a := v as Integer
-			a.str()
+			'Integer(${a.str()})'
 		}
 		Atom {
 			a := v as Atom
@@ -77,7 +84,7 @@ pub fn (v Value) str() string {
 			for i in a {
 				s += i.str()
 			}
-			'[${s}]'
+			'List(${s})'
 		}
 		Tuple {
 			a := v as Tuple
@@ -85,7 +92,7 @@ pub fn (v Value) str() string {
 			for i in a {
 				s << i.str()
 			}
-			'{${s.join(',')}}'
+			'Tuple(${s.join(',')})'
 		}
 		Character {
 			a := v as Character
@@ -97,7 +104,11 @@ pub fn (v Value) str() string {
 		}
 		String {
 			a := v as String
-			"\"${a}\""
+			'String(\'${a}\')'
+		}
+		Float {
+			a := v as Float
+			'Float(${a})'
 		}
 		FloatReg {
 			a := v as FloatReg
