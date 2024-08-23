@@ -1,11 +1,22 @@
 module etf
 
 pub enum Tag {
-	version             = 131
-	compressed_zlib     = 80
-	new_float_ext       = 70
-	bit_binary_ext      = 77
-	atom_cache_ref      = 78
+	version = 131
+	// dist_frag_cont= 70
+	// cached_atom      = 68 // not used anymore
+	dist_header            = 68
+	dist_frag_header       = 69
+	new_float_ext          = 70
+	hopeful_data           = 72
+	atom_internal_ref2     = 73
+	binary_internal_ref    = 74
+	atom_internal_ref3     = 75
+	bitstring_internal_ref = 76
+	bit_binary_ext         = 77
+	magic_ref_internal_ref = 78
+	// new_cache      = 78 // not used anymore
+	compressed          = 80
+	atom_cache_ref      = 82
 	new_pid_ext         = 88
 	new_port_ext        = 89
 	newer_reference_ext = 90

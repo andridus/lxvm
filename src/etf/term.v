@@ -10,7 +10,7 @@ pub type Float = f64
 pub struct Atom {
 pub:
 	name string
-	idx  u32
+	idx  ETerm
 }
 
 pub type Nil = u8

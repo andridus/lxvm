@@ -5,7 +5,7 @@ import errors
 import bif
 import instruction
 
-fn (mut bf BeamFile) scan_instructions() ![]instruction.Instruction {
+fn (mut bf BeamModule) scan_instructions() ![]instruction.Instruction {
 	mut instructions := []instruction.Instruction{}
 	for {
 		op := bf.code.get_next_byte() or { break }
@@ -21,9 +21,10 @@ fn (mut bf BeamFile) scan_instructions() ![]instruction.Instruction {
 				}
 				if arg is etf.Atom {
 					a := arg as etf.Atom
-					if atom := bf.atoms[a.idx] {
+					b := a.idx
+					if atom := bf.atoms[b] {
 						arg = etf.Atom{
-							idx: a.idx
+							idx:  a.idx
 							name: atom
 						}
 					}
@@ -32,19 +33,20 @@ fn (mut bf BeamFile) scan_instructions() ![]instruction.Instruction {
 			}
 		}
 		instructions << instruction.Instruction{
-			op: opcode
+			op:   opcode
 			args: args
 		}
 	}
 	return instructions
 }
 
-fn (mut bf BeamFile) post_process() {
+fn (mut bf BeamModule) post_process() {
 	bf.process_bif() or { println(err.msg()) }
 }
 
-fn (mut bf BeamFile) process_bif() ! {
+fn (mut bf BeamModule) process_bif() ! {
 	instructions := bf.scan_instructions()!
+	println("BBB")
 	bf.lines << Line{}
 	mut last_func_start := u32(0)
 	mut pos := u32(0)
@@ -52,7 +54,6 @@ fn (mut bf BeamFile) process_bif() ! {
 	for instruction in instructions {
 		mut add_instruction := true
 		mut instruction0 := instruction
-
 		match instruction.op {
 			.label {
 				num := instruction.get_literal(0)!
@@ -301,4 +302,5 @@ fn (mut bf BeamFile) process_bif() ! {
 			bf.instructions << instruction0
 		}
 	}
+		println("ccc")
 }

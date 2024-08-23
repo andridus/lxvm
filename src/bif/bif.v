@@ -2,11 +2,11 @@ module bif
 
 import etf
 
-pub fn apply(mfa etf.MFA, args []etf.Value) !etf.Value {
-	return match mfa.str() {
+pub fn apply(mfa0 etf.MFA, args []etf.Value) !etf.Value {
+	return match mfa0.str() {
 		'erlang:+/2' { bif_erlang_plus_2(args[0], args[1])! }
 		'erlang:-/2' { bif_erlang_sub_2(args[0], args[1])! }
-		else { error('BIF ${mfa.str()} not found!') }
+		else { error('BIF ${mfa0.str()} not found!') }
 	}
 }
 

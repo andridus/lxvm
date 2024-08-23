@@ -1,0 +1,3 @@
+#!/bin/bash
+v -cc gcc -gc none -shared -o lxvm.so .
+# cp lxvm.so $ERL_TOP/lxvm.o

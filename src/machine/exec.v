@@ -83,8 +83,8 @@ pub fn (mut vm VM) exec(fun string) ! {
 					arg1 := vm.get_arg_value(vm.modules[0], instruction.args[3])
 					arg2 := vm.get_arg_value(vm.modules[0], instruction.args[4])
 					ret := instruction.args[5]
-					mfa := vm.modules[0].imports[bif_fun]
-					val := bif.apply(mfa, [arg1, arg2])!
+					mfa0 := vm.modules[0].imports[bif_fun].to_mfa()
+					val := bif.apply(mfa0, [arg1, arg2])!
 					// val := etf.Nil(0)
 					// save in register
 					match ret {
@@ -149,7 +149,7 @@ pub fn (mut vm VM) exec(fun string) ! {
 	}
 }
 
-fn (mut vm VM) get_label(mod beam.BeamFile, arg etf.Value) !u32 {
+fn (mut vm VM) get_label(mod beam.BeamModule, arg etf.Value) !u32 {
 	if arg is etf.Label {
 		a := arg as etf.Label
 		if vm.modules[0].labels.len > a {
@@ -159,19 +159,19 @@ fn (mut vm VM) get_label(mod beam.BeamFile, arg etf.Value) !u32 {
 	return error('not found')
 }
 
-fn (mut vm VM) get_arg_value(mod beam.BeamFile, arg etf.Value) etf.Value {
+fn (mut vm VM) get_arg_value(mod beam.BeamModule, arg etf.Value) etf.Value {
 	return match arg {
 		etf.Atom {
 			atom_ := arg as etf.Atom
-			if atom_.idx == 0 {
+			if atom_.idx == etf.ETerm(u32(0)) {
 				etf.Nil(0)
 			} else {
-				atom := vm.atom_table.idx_lookup(u32(atom_.idx)) or {
+				atom := vm.atom_table.idx_lookup(atom_.idx.to_uint()) or {
 					println(err.msg())
 					exit(1)
 				}
 				etf.Atom{
-					idx: atom.idx
+					idx:  atom.idx
 					name: atom.str
 				}
 			}

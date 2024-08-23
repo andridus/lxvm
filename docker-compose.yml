@@ -1,0 +1,8 @@
+services:
+  v:
+    build: .
+    # tty: true
+    # stdin_open: true
+    command: './build'
+    volumes:
+      - .:/app

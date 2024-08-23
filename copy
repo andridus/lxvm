@@ -1,0 +1,3 @@
+#!/bin/bash
+docker compose up
+cp lxvm.so $ERL_TOP/lxvm.o

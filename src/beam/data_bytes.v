@@ -74,7 +74,7 @@ pub fn (mut db DataBytes) compact_term_encoding() !etf.Value {
 				}
 				2 {
 					etf.Value(etf.Atom{
-						idx: u32(value)
+						idx: etf.SInt(value).to_eterm()
 					})
 				}
 				3 {

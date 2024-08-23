@@ -33,35 +33,35 @@ pub fn (err InternalError) msg() string {
 
 pub fn new(msg string) InternalError {
 	return InternalError{
-		msg: msg
+		msg:  msg
 		kind: .hide
 	}
 }
 
 pub fn new_error(msg string) InternalError {
 	return InternalError{
-		msg: msg
+		msg:  msg
 		kind: .error
 	}
 }
 
 pub fn new_info(msg string) InternalError {
 	return InternalError{
-		msg: msg
+		msg:  msg
 		kind: .info
 	}
 }
 
 pub fn new_warn(msg string) InternalError {
 	return InternalError{
-		msg: msg
+		msg:  msg
 		kind: .warn
 	}
 }
 
 pub fn hide(msg string) InternalError {
 	return InternalError{
-		msg: msg
+		msg:  msg
 		kind: .hide
 	}
 }

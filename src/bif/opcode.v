@@ -1,7 +1,10 @@
 module bif
 
+pub const beam_format_number = 0
+pub const max_generic_opcode = 163
+
 pub enum Opcode {
-	label                = 1
+	label = 1
 	func_info
 	int_code_end
 	call
@@ -140,9 +143,9 @@ pub enum Opcode {
 	bs_restore2
 	gc_bif1
 	gc_bif2
-	bs_final2 //
+	bs_final2         //
 	bs_bits_to_bytes2 //
-	put_literal //
+	put_literal       //
 	is_bitstr
 	bs_context_to_binary
 	bs_test_unit
