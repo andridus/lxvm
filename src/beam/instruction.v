@@ -46,7 +46,7 @@ fn (mut bf BeamModule) post_process() {
 
 fn (mut bf BeamModule) process_bif() ! {
 	instructions := bf.scan_instructions()!
-	println("BBB")
+	println('BBB')
 	bf.lines << Line{}
 	mut last_func_start := u32(0)
 	mut pos := u32(0)
@@ -302,5 +302,5 @@ fn (mut bf BeamModule) process_bif() ! {
 			bf.instructions << instruction0
 		}
 	}
-		println("ccc")
+	println('ccc')
 }

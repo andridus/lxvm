@@ -10,7 +10,7 @@ import beam
 @[heap]
 pub struct Machine {
 pub mut:
-	atom_table &atom.AtomTable
+	atom_table                &atom.AtomTable
 	bc_pools                  [3]etf.BeamCatchPool
 	module_tables             [3][]beam.BeamModule
 	ranges                    [3]etf.Ranges
@@ -34,7 +34,7 @@ pub fn Machine.init() !&Machine {
 	mut the_active_code_ix := u64(0)
 	mut the_staging_code_ix := u64(0)
 	m := Machine{
-		atom_table:								 atom_table
+		atom_table:                atom_table
 		bc_pools:                  bc_pools
 		ranges:                    ranges
 		debug_start_load_ix:       &debug_start_load_ix
@@ -90,8 +90,9 @@ pub fn (mut m Machine) commit_staging_code() {
 
 	// m.tracer_lock.post()
 }
+
 pub fn (mut m Machine) load_preloaded() ! {
-	mut loaded_modules := map[string][]u8
+	mut loaded_modules := map[string][]u8{}
 	modules := [
 		'otp_ring0',
 		// 'erts_code_purger',
@@ -111,12 +112,14 @@ pub fn (mut m Machine) load_preloaded() ! {
 		// 'atomics',
 		// 'counters',
 		// 'persistent_term'
-		]
+	]
 	for mod in modules {
-		loaded_modules[mod] = os.read_bytes("${@VMODROOT}/preload/${mod}.beam")!
+		loaded_modules[mod] = os.read_bytes('${@VMODROOT}/preload/${mod}.beam')!
 	}
 	for mod, code in loaded_modules {
-		if code.len == 0 { return error('Failed to find preloaded code for module ${mod}') }
+		if code.len == 0 {
+			return error('Failed to find preloaded code for module ${mod}')
+		}
 		m.load_beam_from_bytes(code)!
 	}
 }

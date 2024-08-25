@@ -25,12 +25,12 @@ pub fn VM.init() !VM {
 
 pub fn (mut vm VM) load_beam_from_bytes(bytes []u8) {
 	mut b := beam.BeamModule.init(vm.atom_table)
-	loaded_module := b.load_from_bytes(bytes) or {exit(0)}
+	loaded_module := b.load_from_bytes(bytes) or { exit(0) }
 	vm.modules << loaded_module
 }
 
 pub fn (mut vm VM) load_beam(path string) {
 	mut b := beam.BeamModule.init(vm.atom_table)
-	loaded_module := b.load_file(path) or {exit(0)}
+	loaded_module := b.load_file(path) or { exit(0) }
 	vm.modules << loaded_module
 }

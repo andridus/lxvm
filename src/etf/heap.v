@@ -22,7 +22,8 @@ pub struct OffHeapHeader {
 @[aligned]
 pub struct OFFHeap {
     first &OffHeapHeader
-    overhead u64     /* Administrative overhead (used to force GC). */
+    overhead u64
+    /* Administrative overhead (used to force GC). */
 }
 @[aligned]
 pub struct HeapFactory{

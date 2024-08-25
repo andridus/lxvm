@@ -26,10 +26,11 @@ fn (mut bf BeamModule) decode_size(mut data DataBytes) !u64 { // it's should be 
 	mut heap_size := u64(0)
 	mut atom_extra_skip := 0
 	mut terms := u32(1)
-	tag := etf.Tag.from(data.get_next_byte()!)!
+
 	// reds := u32(0)
 	for terms > 0 {
-		println('t erms ${terms} and tag ${tag}')
+		tag := etf.Tag.from(data.get_next_byte()!)!
+		println('${tag}[${int(tag)}]')
 		match tag {
 			.integer_ext {
 				data.ignore_bytes(4)!
@@ -56,7 +57,7 @@ fn (mut bf BeamModule) decode_size(mut data DataBytes) !u64 { // it's should be 
 				if n > etf.max_atom_characters {
 					return error('max atom characters')
 				}
-				data.ignore_bytes(2 + atom_extra_skip)!
+				data.ignore_bytes(n + atom_extra_skip)!
 				atom_extra_skip = 0
 			}
 			.small_atom_ext {
@@ -136,7 +137,6 @@ fn (mut bf BeamModule) decode_size(mut data DataBytes) !u64 { // it's should be 
 			}
 			.list_ext {
 				n := data.get_next_u32()!
-				data.ignore_bytes(n)!
 				terms = add_terms(terms, n + 1)!
 				heap_size += 2 * n
 			}
@@ -157,14 +157,13 @@ fn (mut bf BeamModule) decode_size(mut data DataBytes) !u64 { // it's should be 
 			}
 			.map_ext {
 				n := data.get_next_u32()!
-				data.ignore_bytes(n)!
-				terms = add_terms(terms, n)!
+				terms = add_terms(terms, n * 2)!
 				if n <= etf.map_small_limit {
-					heap_size += n + 3
+					heap_size += n + 3 + 1 + n
 
-					if n > 0 {
-						heap_size += 1 + n
-					}
+					// if n > 0 { // latest version
+					// 	heap_size += 1 + n
+					// }
 				}
 				// $if x64 {
 				// 	else if (n >> 31) != 0 {
@@ -176,10 +175,9 @@ fn (mut bf BeamModule) decode_size(mut data DataBytes) !u64 { // it's should be 
 				}
 				// }
 				else {
-					data.ignore_bytes(2 * n)!
+					// data.ignore_bytes(2 * n)!
 					heap_size += etf.hashmap_estimated_heap_size(n)
 				}
-				terms = add_terms(terms, 2 * n)!
 			}
 			.string_ext {
 				n := data.get_next_u16()!
@@ -196,11 +194,14 @@ fn (mut bf BeamModule) decode_size(mut data DataBytes) !u64 { // it's should be 
 			}
 			.binary_ext {
 				n := data.get_next_u32()!
-				data.ignore_bytes(2)!
+				data.ignore_bytes(n)!
+
 				if n < etf.onheap_binary_limit {
-					heap_size += etf.heap_bits_size(etf.nbits(u64(n)))
+					heap_size += etf.heap_bin_size(n)
+				} else {
+					heap_size += etf.proc_bin_size
 				}
-				heap_size += etf.refc_bits_size
+				// exit(0)
 			}
 			.bit_binary_ext {
 				n := data.get_next_u32()!
@@ -269,6 +270,7 @@ pub fn (mut bf BeamModule) decode_etf(data []u8) !etf.Value {
 	}
 	return bf.decode_ext(mut data0)!
 }
+
 fn (mut bf BeamModule) decode_ext(mut data DataBytes) !etf.Value { // it's should be UInt ?
 	tag := etf.Tag.from(data.get_next_byte()!)!
 	value := match tag {
@@ -380,8 +382,6 @@ fn (mut bf BeamModule) decode_ext(mut data DataBytes) !etf.Value { // it's shoul
 	return value
 }
 
-
-
 fn (mut bf BeamModule) decode_atom_ext(mut data DataBytes) !etf.Value {
 	//		atom_utf8_ext
 	//    length: 2-bytes
@@ -394,6 +394,7 @@ fn (mut bf BeamModule) decode_atom_ext(mut data DataBytes) !etf.Value {
 		name: atom.str
 	}
 }
+
 fn (mut bf BeamModule) decode_small_atom_ext(mut data DataBytes) !etf.Value {
 	//		small_atom_utf8_ext
 	//    length: 1-bytes
@@ -415,15 +416,17 @@ fn (bf BeamModule) decode_string(mut data DataBytes) !etf.Value {
 	str := data.get_all_next_bytes()!
 	return etf.String(str.bytestr())
 }
+
 fn (bf BeamModule) decode_integer(mut data DataBytes) !etf.Value {
 	//		integer_ext
 	//    value: 4-bytes
-		return etf.Integer(data.get_next_u32()!)
+	return etf.Integer(data.get_next_u32()!)
 }
+
 fn (bf BeamModule) decode_small_integer(mut data DataBytes) !etf.Value {
 	//		small_integer_ext
 	//    value: 1-byte
-		return etf.Integer(data.get_next_byte()!)
+	return etf.Integer(data.get_next_byte()!)
 }
 
 fn (bf BeamModule) decode_bignum(n u8, mut data DataBytes) !etf.Value {
@@ -448,15 +451,15 @@ fn (bf BeamModule) decode_bignum(n u8, mut data DataBytes) !etf.Value {
 fn (bf BeamModule) decode_float(mut data DataBytes) !etf.Value {
 	//		float_ext
 	//    value: 31-bytes
-		// data.get_next_bytes(31)!.bytestr()
-		return etf.Float(0.0)
+	// data.get_next_bytes(31)!.bytestr()
+	return etf.Float(0.0)
 }
 
 fn (bf BeamModule) decode_new_float(mut data DataBytes) !etf.Value {
 	//		new_float_ext
 	//    value: 8-bytes
-		// float := data.get_bytes(8)!
-		return etf.Float(0.0)
+	// float := data.get_bytes(8)!
+	return etf.Float(0.0)
 }
 
 fn (mut bf BeamModule) decode_tuple(n u8, mut data DataBytes) !etf.Value {
@@ -479,6 +482,7 @@ fn (mut bf BeamModule) decode_list(mut data DataBytes) !etf.Value {
 	}
 	return etf.List(terms)
 }
+
 fn (mut bf BeamModule) decode_pid(mut data DataBytes) !etf.Value {
 	//    pid_ext
 	//    arity: 1-byte

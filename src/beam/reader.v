@@ -17,6 +17,7 @@ const chunks = {
 	'attr_chunk': 'Attr'.bytes(),
 	'compile_chunk': 'CInf'.bytes(),
 	'line_chunk': 'Line'.bytes(),
+	'dbgi_chunk': 'Dbgi'.bytes(),
 	'loc_chunk': 'LocT'.bytes(), // future versions
 	'type_chunk': 'Type'.bytes(), // future versions
 	'meta_chunk': 'Meta'.bytes(), // future versions
@@ -133,7 +134,9 @@ pub fn (mut bf BeamModule) do_scan_beam() ! {
 		}
 	}
 
-	// Read line table, if present
+	// // Read line table, if present
+	// Fix This
+	println(chunks0['dbgi_chunk'].size)
 	if chunks0['line_chunk'].size > 0 {
 		//if !parse_import_chunk
 		return error(BeamFileResult.read_corrupt_line_table.str())
@@ -439,14 +442,16 @@ fn (mut bf BeamModule) parse_literal_chunk(data []u8) ! {
 	if !check_item_count(total_literals, 0, sizeof(LiteralEntry)) { return error("exceed limit 1GB") }
 
 	// mut literals := []LiteralEntry{}
-	mut all_heap_size := u64(0)
+	// mut all_heap_size := u64(0)
 	for _ in 0 .. total_literals {
-
 		ext_size := decompressed_data.get_next_u32()!
 		ext_data := decompressed_data.get_next_bytes(ext_size)!
+		/*
+			NOTE: about heap_size
+			maybe use to align heap.. I think that V align array for me. (I maintain this code for now)
+			all_heap_size += heap_size
+		 */
 		heap_size := bf.decode_ext_size(ext_data)!
-		all_heap_size += heap_size
-
 		if heap_size > 0 {
 
 			// factory := etf.HeapFactory.init(heap_size, .prepared_code)

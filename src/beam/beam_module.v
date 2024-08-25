@@ -10,7 +10,7 @@ pub mut:
 	bytes            DataBytes
 	atom_table       &atom.AtomTable
 	mod              etf.ETerm
-	mod_name				string
+	mod_name         string
 	name             atom.Atom
 	otp_20_or_higher bool
 	head_size        u32

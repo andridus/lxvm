@@ -43,7 +43,8 @@ struct ErtsDistExternal {
 	// heap_size DistEntry
 	connection_id int
 	flags int
-	mld &ErtsMonLnkDist   /* copied from DistEntry.mld */
+	mld &ErtsMonLnkDist
+    /* copied from DistEntry.mld */
 	// attab ErtsAtomTranslationTable;
 }
 struct ErlMsg {

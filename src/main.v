@@ -76,7 +76,7 @@ fn lxvm_beam_iff_init(magic &u8, process &u8, group_loader etf.ETerm, modp etf.E
 // 	// vm.loop()
 // }
 
-fn lxvm_init() !&lxrts.Machine{
+fn lxvm_init() !&lxrts.Machine {
 	mut vm := lxrts.Machine.init()!
 	vm.load_preloaded()!
 	// vm.end_staging_code()
@@ -84,11 +84,11 @@ fn lxvm_init() !&lxrts.Machine{
 	vm.initialised = true
 	return vm
 }
+
 fn main() {
 	_ := lxvm_init() or {
-		println("ERROR: ${err.msg()}")
+		println('ERROR: ${err.msg()}')
 		exit(1)
 	}
-	println("Process done with success")
-
+	println('Process done with success')
 }

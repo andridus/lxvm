@@ -1,6 +1,7 @@
 module etf
 
 pub const erts_max_ref_numbers = 5
+pub const proc_bin_size = 6 // TODO: PROC_BIN_SIZE
 pub const function_max_args = 255
 pub const big_arity_max = ((1 << 17) - 1)
 pub const max_atom_characters = 255
